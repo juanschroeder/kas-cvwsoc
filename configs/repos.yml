@@ -1,0 +1,53 @@
+header:
+  version: 14
+
+
+repos:
+  # layers aligned on whinlatter release (5.3) or similar
+  oecore:
+      path: layers/openembedded-core
+      url: "https://github.com/openembedded/openembedded-core.git"
+      commit: 000a044d285d93ded3280f27360165c943bb5d7e
+      layers:
+        meta:
+
+  meta-openembedded:
+      path: layers/meta-openembedded
+      url: "https://github.com/openembedded/meta-openembedded.git"
+      commit: d28d0a23615f4d91d125fdcd247a71245087dab3
+      layers:
+        meta-oe:
+        meta-python:
+        meta-networking:
+        meta-multimedia:
+        meta-filesystems:
+        meta-gnome:
+        meta-xfce:
+        meta-webserver:
+        meta-perl:
+
+  riscv:
+      path: layers/meta-riscv
+      url: "https://github.com/riscv/meta-riscv.git"
+      commit: 86d77583f76969120e1b250f0a74b88afafade06
+
+  yocto:
+      path: layers/meta-yocto
+      url: "https://git.yoctoproject.org/meta-yocto"
+      commit: 6973ca663aaa9c3ab517ee960ab7985a5bf54c07 
+      layers:
+        meta-poky:
+  meta-doom:
+      path: layers/meta-doom
+      url: "https://github.com/JPEWdev/meta-doom.git"
+      commit: c15f86d920c2bbcc5ba25cd0e464d4556067ff4d
+      patches:
+        layerpatch:
+          path: ../patches/meta-doom/0001-make-whinlatter-compatible.patch
+          repo: meta-doom
+
+  meta-cvwsoc:
+    path: ./
+    layers:
+      meta-cvwsoc:
+

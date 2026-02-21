@@ -1,0 +1,9 @@
+# short-description: Create SD card image for CVW SoC
+
+bootloader --ptable gpt
+
+part fdt --part-name fdt --source rawcopy --sourceparams="file=${RISCV_SBI_FDT}"  --ondisk mmcblk0  --fstype=none --overhead-factor 1.0 --extra-partition-space 0 --align 1
+part opensbi --part-name opensbi --source rawcopy --sourceparams="file=fw_jump.bin" --ondisk mmcblk0 --fstype=none --overhead-factor 1.0 --extra-partition-space 0 --align 4
+part u-boot --part-name u-boot --source rawcopy --sourceparams="file=u-boot.bin"  --ondisk mmcblk0 --fstype=none --overhead-factor 1.0 --extra-partition-space 0 --align 4
+part kernel --part-name kernel --source rawcopy --sourceparams="file=${KERNEL_IMAGETYPE}" --ondisk mmcblk0 --fstype=none --overhead-factor 1.0 --extra-partition-space 0 --align 4
+part / --part-name rootfs   --source rootfs --ondisk mmcblk0 --fstype=ext4 --label rootfs  --align 1024 --use-uuid
