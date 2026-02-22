@@ -31,8 +31,6 @@ KERNEL_IMAGETYPE = "Image.lz4"
 #============================================
 # Image Configuration
 EXTRA_IMAGEDEPENDS += "u-boot-cvwsoc"
-WKS_FILES:remove = "core-image-minimal.wks"
-WKS_FILE ?= "cvwsoc.wks.in"
 IMAGE_BOOT_FILES:append = " \
     fw_jump.bin      \
     ${RISCV_SBI_FDT}    \

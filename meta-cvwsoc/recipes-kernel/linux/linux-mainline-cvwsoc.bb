@@ -59,6 +59,5 @@ do_deploy:append() {
     fi
 }
 
-# Is this a 6.12 only issue?
 # This is broken in current Yocto: https://lists.openembedded.org/g/openembedded-core/message/226911
 KERNEL_FEATURES:remove = "${KERNEL_FEATURES_RISCV}"
