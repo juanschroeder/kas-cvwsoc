@@ -14,7 +14,7 @@ PREFERRED_PROVIDER_virtual/zdoom = "fbdoom"
 #============================================
 CVWSOC_BOARDNAME ?= "nexysa7"
 
-CVWSOC_DTS_FILENAME ?= "wally-${CVWSOC_BOARDNAME}"
+CVWSOC_DTS_FILENAME ?= "wally-${CVWSOC_BOARDNAME}soc"
 
 #============================================
 # SBI Configuration
@@ -36,7 +36,7 @@ IMAGE_BOOT_FILES:append = " \
     ${RISCV_SBI_FDT}    \
 "
 
-IMAGE_FSTYPES += "tar.gz"
+IMAGE_FSTYPES += "tar.gz cpio.gz"
 #============================================
 
 #============================================
