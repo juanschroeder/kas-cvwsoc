@@ -11,9 +11,11 @@ do_configure:append() {
     merge_config.sh -m .config busybox.cfg
 }
 
-#debug
-#SRC_URI:append = " file://fragment-static.cfg "
-#do_configure:append() {
-#    install -D -m644 ${UNPACKDIR}/fragment-static.cfg ${B}
-#    merge_config.sh -m .config fragment-static.cfg
-#}
+# loader fails on the 'tiny' build without static busybox
+SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', ' file://fragment-static.cfg ', '', d)}"
+do_configure:append() {
+    if [ -f "${UNPACKDIR}/fragment-static.cfg" ]; then
+        install -D -m644 ${UNPACKDIR}/fragment-static.cfg ${B}
+        merge_config.sh -m .config fragment-static.cfg
+    fi;
+}

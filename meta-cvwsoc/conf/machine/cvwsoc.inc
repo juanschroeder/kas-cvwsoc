@@ -37,6 +37,8 @@ IMAGE_BOOT_FILES:append = " \
 "
 
 IMAGE_FSTYPES += "tar.gz cpio.gz"
+# in case rootfs is in RAM
+RAMFS_LOAD_ADDR = "0x84200000"
 #============================================
 
 #============================================

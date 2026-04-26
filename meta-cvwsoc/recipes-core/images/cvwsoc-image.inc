@@ -17,3 +17,6 @@ EXTRA_USERS_PARAMS = "useradd cvw; \
 # reference wic image. Must be overridden for other partition setup (e.g. initramfs)
 WKS_FILES:remove = "core-image-minimal.wks"
 WKS_FILE ?= "cvwsoc.wks.in"
+
+# Force u-boot deploy
+do_image[depends] += "virtual/bootloader:do_deploy"

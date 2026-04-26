@@ -14,7 +14,7 @@ DEPENDS += "u-boot-tools-native"
 BRANCH = "master"
 KBUILD_DEFCONFIG ?= "linux.soc.config"
 
-SRCREV_BUILDROOT = "32cd501c73e64cbcde8368f59610506f25f00482"
+SRCREV_BUILDROOT = "45d0afdd82645d529134ffc51c8c73ffa21c3f9b"
 SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git;protocol=https;branch=${BRANCH} \
             https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config \
             https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts \
@@ -25,13 +25,15 @@ SRC_URI[config.sha256sum] = "0e1f551eafeeba02c90640126d4b0d7487d097c91cbf1e91c17
 SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
 DTS_SHA256:cvwsoc-nexysa7 = "a3e66df00181ef8c208ddbd4adb80261782752826fe0d1b1c9a42cf60fa21e18"
 DTS_SHA256:cvwsoc-genesys2 = "994f24c60859d10181b530bc7fa1289d10f3ea35a4011b07a004de097d9a557b"
+DTS_SHA256:cvwsoc-virt = "6b30cf79d0aa46d7dce34d829d41eb6549371c32509201343cce186ebc5230f1"
 
 # tiny Kernel
 SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
-                'file://fragment-tiny.cfg file://fragment-tinier.cfg  \
-                file://fragment-noefi.cfg ', '', d)}"
+                'file://fragment-tiny1.cfg \
+                file://fragment-tiny2.cfg  \
+                file://fragment-tiny3.cfg ', '', d)}"
 
-# # EXT2 ramfs seems to be slower
+# EXT2 seems to be slower than cpio
 # SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
 #                ' file://fragment-reenable-fs.cfg ', '', d)}"
 
@@ -46,6 +48,7 @@ LINUX_VERSION = "6.12"
 SRCREV = "adc218676eef25575469234709c2d87185ca223a"
 SRC_URI:append:cvwsoc-nexysa7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-genesys2 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2-dtb.patch', '', d)}"
+SRC_URI:append:cvwsoc-virt = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvw-wally-dtb.patch', '', d)}"
 
 COMPATIBLE_MACHINE = "(cvwsoc)"
 
