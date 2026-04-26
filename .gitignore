@@ -1,1 +1,4 @@
+build/
 layers/
+.vscode*
+.kas_shell_history
