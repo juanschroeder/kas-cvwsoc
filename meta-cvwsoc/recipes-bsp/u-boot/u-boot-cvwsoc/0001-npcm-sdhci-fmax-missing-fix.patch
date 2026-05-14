@@ -1,0 +1,19 @@
+
+Make Nuvoton driver use 'max-frequency' as max and not
+'clock-frequency' instead.
+
+Upstream-Status: Pending
+
+diff --git a/drivers/mmc/npcm_sdhci.c b/drivers/mmc/npcm_sdhci.c
+index dff4732ea06..80bf774edcd 100644
+--- a/drivers/mmc/npcm_sdhci.c
++++ b/drivers/mmc/npcm_sdhci.c
+@@ -53,7 +53,7 @@ static int npcm_sdhci_probe(struct udevice *dev)
+ 	host->mmc->dev = dev;
+ 	upriv->mmc = host->mmc;
+ 
+-	ret = sdhci_setup_cfg(&plat->cfg, host, 0, NPCM_SDHC_MIN_FREQ);
++	ret = sdhci_setup_cfg(&plat->cfg, host, plat->cfg.f_max, NPCM_SDHC_MIN_FREQ);
+ 	if (ret)
+ 		return ret;
+ 

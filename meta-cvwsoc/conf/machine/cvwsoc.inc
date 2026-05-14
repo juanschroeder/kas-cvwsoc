@@ -25,7 +25,7 @@ unset RISCV_SBI_PAYLOAD
 #============================================
 # Kernel Configuration
 KERNEL_DEVICETREE ?= "${CVWSOC_DTS_FILENAME}.dtb"
-KERNEL_IMAGETYPE = "Image.lz4"
+KERNEL_IMAGETYPE ?= "Image.lz4"
 #============================================
 
 #============================================

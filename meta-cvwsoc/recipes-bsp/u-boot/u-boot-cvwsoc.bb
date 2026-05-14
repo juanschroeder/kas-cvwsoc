@@ -3,14 +3,16 @@ require recipes-bsp/u-boot/u-boot-common.inc
 
 DEPENDS += "u-boot-tools-native"
 
-SRCREV:cvwsoc = "f53238cb9c0bee7b589572a7c0261b12d394d1bc"
+SRCREV:cvwsoc = "4f61c080a2530818e20404cddc7cfc17c52af99e"
 
+FILESEXTRAPATHS:prepend := "${THISDIR}:${PN}:"
 SRC_URI:cvwsoc = "git://github.com/juanschroeder/u-boot.git;protocol=https;nobranch=1"
 SRC_URI[sha256sum] = "0f351a760196250a8bc95e839d5ba97006886dc2fa19a7cbde20967307d497e1"
 # Why is this always added in the base SRC_URI ???
 SRC_URI:remove:cvwsoc = " ${SRC_URI_RISCV}"
+SRC_URI:append = "  file://fragment-sdhci.cfg \
+                    file://0001-npcm-sdhci-fmax-missing-fix.patch "
 
-FILESEXTRAPATHS:prepend := "${THISDIR}:${PN}:"
 
 LIC_FILES_CHKSUM:cvwsoc = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 

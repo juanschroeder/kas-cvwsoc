@@ -1,0 +1,192 @@
+Generic SDHCI driver coming from reference SDHCI repo.
+
+Upstream-Status: Pending
+
+From 802935a6a27e48050339a19704700adc0b0ed282 Mon Sep 17 00:00:00 2001
+From: Axel Vanoni <axvanoni@student.ethz.ch>
+Date: Tue, 17 Feb 2026 16:56:00 +0100
+Subject: [PATCH] Add sdhci driver
+
+---
+ drivers/mmc/host/Kconfig         |  12 +++
+ drivers/mmc/host/Makefile        |   1 +
+ drivers/mmc/host/sdhci-generic.c | 135 +++++++++++++++++++++++++++++++
+ 3 files changed, 148 insertions(+)
+ create mode 100644 drivers/mmc/host/sdhci-generic.c
+
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index c1de2de09159..d433325a26bd 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -141,6 +141,18 @@ config MMC_SDHCI_PLTFM
+ 
+ 	  If unsure, say N.
+ 
++config MMC_SDHCI_GENERIC
++	tristate "Generic SDHCI driver"
++	depends on MMC_SDHCI
++	depends on MMC_SDHCI_PLTFM
++	select MMC_SDHCI_IO_ACCESSORS
++	help
++	  This selects a generic OF SDHCI driver based on the NPCM driver.
++
++	  If you have a SDHCI host controller without any specific driver, say Y or M here.
++
++	  If unsure, say N.
++
+ config MMC_SDHCI_OF_ARASAN
+ 	tristate "SDHCI OF support for the Arasan SDHCI controllers"
+ 	depends on MMC_SDHCI_PLTFM
+diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+index 7f544b2edaaa..0b05f083d7ba 100644
+--- a/drivers/mmc/host/Makefile
++++ b/drivers/mmc/host/Makefile
+@@ -89,6 +89,7 @@ obj-$(CONFIG_MMC_SDHCI_ESDHC_MCF)       += sdhci-esdhc-mcf.o
+ obj-$(CONFIG_MMC_SDHCI_ESDHC_IMX)	+= sdhci-esdhc-imx.o
+ obj-$(CONFIG_MMC_SDHCI_DOVE)		+= sdhci-dove.o
+ obj-$(CONFIG_MMC_SDHCI_TEGRA)		+= sdhci-tegra.o
++obj-$(CONFIG_MMC_SDHCI_GENERIC)         += sdhci-generic.o
+ obj-$(CONFIG_MMC_SDHCI_OF_ARASAN)	+= sdhci-of-arasan.o
+ obj-$(CONFIG_MMC_SDHCI_OF_ASPEED)	+= sdhci-of-aspeed.o
+ obj-$(CONFIG_MMC_SDHCI_OF_AT91)		+= sdhci-of-at91.o
+diff --git a/drivers/mmc/host/sdhci-generic.c b/drivers/mmc/host/sdhci-generic.c
+new file mode 100644
+index 000000000000..b2a4b63ca9a0
+--- /dev/null
++++ b/drivers/mmc/host/sdhci-generic.c
+@@ -0,0 +1,135 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * NPCM SDHC MMC host controller driver.
++ * Adapted to remove non-generic configuration
++ *
++ * Copyright (c) 2023 Nuvoton Technology corporation.
++ */
++
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/mmc.h>
++#include <linux/mod_devicetable.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++
++#include "sdhci-pltfm.h"
++
++// backported from newer versions
++int sdhci_pltfm_remove(struct platform_device *pdev)
++{
++	struct sdhci_host *host = platform_get_drvdata(pdev);
++	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
++
++	sdhci_remove_host(host, dead);
++	sdhci_pltfm_free(pdev);
++	return 0;
++}
++
++static u32 sdhci_generic_readl_no_fence(struct sdhci_host *host, int reg)
++{
++	// CVA6 has fences that take ~500 cycles and a LSU that
++	// does not parallelize on io addresses
++	return *(volatile u32*)(host->ioaddr + reg);
++}
++
++static void sdhci_generic_writel_no_fence(struct sdhci_host *host, u32 val, int reg)
++{
++	// CVA6 has fences that take ~500 cycles and a LSU that
++	// does not parallelize on io addresses
++	*(volatile u32*)(host->ioaddr + reg) = val;
++}
++
++static const struct sdhci_ops sdhci_generic_ops = {
++	.write_l = sdhci_generic_writel_no_fence,
++	.read_l  = sdhci_generic_readl_no_fence,
++	.set_clock = sdhci_set_clock,
++	.set_bus_width = sdhci_set_bus_width,
++	.reset = sdhci_reset,
++	.set_uhs_signaling = sdhci_set_uhs_signaling,
++};
++
++static const struct sdhci_pltfm_data sdhci_generic_pdata = {
++	.ops = &sdhci_generic_ops,
++};
++
++static int generic_sdhci_probe(struct platform_device *pdev)
++{
++	// const struct sdhci_pltfm_data *data;
++	struct sdhci_pltfm_host *pltfm_host;
++	struct device *dev = &pdev->dev;
++	struct sdhci_host *host;
++	u32 caps;
++	int ret;
++
++
++
++	// we don't have any match data registered below, so skip this part
++	/* data = of_device_get_match_data(dev); */
++	/* if (!data) { */
++	/* 	printk("of_device_get_match_data error\n"); */
++	/* 	return -EINVAL; */
++	/* } */
++
++	// host = sdhci_pltfm_init(pdev, data, 0);
++	host = sdhci_pltfm_init(pdev, &sdhci_generic_pdata, 0);
++	if (IS_ERR(host)) {
++		printk("pltfm_init error\n");
++		return PTR_ERR(host);
++	}
++
++	pltfm_host = sdhci_priv(host);
++
++	pltfm_host->clk = devm_clk_get_optional_enabled(dev, NULL);
++	if (IS_ERR(pltfm_host->clk)) {
++		printk("devm_clk_get_optional_enabled failed\n");
++		ret = PTR_ERR(pltfm_host->clk);
++		goto err_sdhci;
++	}
++
++	caps = sdhci_readl(host, SDHCI_CAPABILITIES);
++	if (caps & SDHCI_CAN_DO_8BIT)
++		host->mmc->caps |= MMC_CAP_8_BIT_DATA;
++
++	ret = mmc_of_parse(host->mmc);
++	if (ret) {
++		printk("mmc_of_parse failed\n");
++		goto err_sdhci;
++	}
++
++	ret = sdhci_add_host(host);
++	if (ret) {
++		printk("sdhci_add_host failed\n");
++		goto err_sdhci;
++	}
++
++	return 0;
++
++err_sdhci:
++	sdhci_pltfm_free(pdev);
++	return ret;
++}
++
++static const struct of_device_id generic_sdhci_of_match[] = {
++	{ .compatible = "sdhci" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, generic_sdhci_of_match);
++
++static struct platform_driver generic_sdhci_driver = {
++	.driver = {
++		.name	= "generic-sdhci",
++		.of_match_table = generic_sdhci_of_match,
++		.pm	= &sdhci_pltfm_pmops,
++	},
++	.probe		= generic_sdhci_probe,
++	.remove		= sdhci_pltfm_remove,
++};
++module_platform_driver(generic_sdhci_driver);
++
++MODULE_DESCRIPTION("Generic Secure Digital Host Controller Interface driver");
++MODULE_AUTHOR("Tomer Maimon <tomer.maimon@nuvoton.com>");
++MODULE_LICENSE("GPL");

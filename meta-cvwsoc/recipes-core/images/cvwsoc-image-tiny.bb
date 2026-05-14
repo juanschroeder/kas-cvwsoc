@@ -13,6 +13,8 @@ PACKAGE_INSTALL = "busybox base-files base-passwd"
 NO_RECOMMENDATIONS = "1"
 IMAGE_LINGUAS = " "
 
+WKS_FILE = "cvwsoc-tiny.wks.in"
+
 DEPENDS:append = "dtc-native"
 python do_generate_initrd_info_dtb() {
     import os

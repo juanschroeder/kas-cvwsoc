@@ -1,0 +1,63 @@
+Fixes on this driver that made it stable and compile for
+this Kernel version.
+
+Upstream-Status: Pending
+
+diff --git a/drivers/mmc/host/sdhci-generic.c b/drivers/mmc/host/sdhci-generic.c
+index b2a4b63ca9a0..7d16a5ce77f7 100644
+--- a/drivers/mmc/host/sdhci-generic.c
++++ b/drivers/mmc/host/sdhci-generic.c
+@@ -18,16 +18,16 @@
+ 
+ #include "sdhci-pltfm.h"
+ 
+-// backported from newer versions
+-int sdhci_pltfm_remove(struct platform_device *pdev)
+-{
+-	struct sdhci_host *host = platform_get_drvdata(pdev);
+-	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
+-
+-	sdhci_remove_host(host, dead);
+-	sdhci_pltfm_free(pdev);
+-	return 0;
+-}
++// backported from newer versions => REMOVED: already exists in 6.12
++//int sdhci_pltfm_remove(struct platform_device *pdev)
++//{
++//	struct sdhci_host *host = platform_get_drvdata(pdev);
++//	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
++//
++//	sdhci_remove_host(host, dead);
++//	sdhci_pltfm_free(pdev);
++//	return 0;
++//}
+ 
+ static u32 sdhci_generic_readl_no_fence(struct sdhci_host *host, int reg)
+ {
+@@ -53,6 +53,7 @@ static const struct sdhci_ops sdhci_generic_ops = {
+ };
+ 
+ static const struct sdhci_pltfm_data sdhci_generic_pdata = {
++	.quirks = SDHCI_QUIRK_NO_LED,
+ 	.ops = &sdhci_generic_ops,
+ };
+ 
+@@ -81,6 +82,9 @@ static int generic_sdhci_probe(struct platform_device *pdev)
+ 		return PTR_ERR(host);
+ 	}
+ 
++	// Issues were seen during sdhci_defer_done() => not executing in interrupt context
++	host->always_defer_done = true;
++
+ 	pltfm_host = sdhci_priv(host);
+ 
+ 	pltfm_host->clk = devm_clk_get_optional_enabled(dev, NULL);
+@@ -126,7 +130,7 @@ static struct platform_driver generic_sdhci_driver = {
+ 		.pm	= &sdhci_pltfm_pmops,
+ 	},
+ 	.probe		= generic_sdhci_probe,
+-	.remove		= sdhci_pltfm_remove,
++	//.remove		= sdhci_pltfm_remove, // Not for Kernel 6.12
+ };
+ module_platform_driver(generic_sdhci_driver);
+ 

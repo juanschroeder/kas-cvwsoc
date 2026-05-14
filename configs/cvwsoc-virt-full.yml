@@ -8,4 +8,6 @@ local_conf_header:
   common: |
     MACHINE = "cvwsoc-virt"
     DISTRO = "distro-cvwsoc-basic"
+    # Uncompressed Kernel in the Image is faster for simulation
+    KERNEL_IMAGETYPE = "Image"
 
