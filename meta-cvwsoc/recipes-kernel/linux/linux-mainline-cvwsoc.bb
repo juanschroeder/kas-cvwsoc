@@ -14,7 +14,7 @@ DEPENDS += "u-boot-tools-native"
 BRANCH = "master"
 KBUILD_DEFCONFIG ?= "linux.soc.config"
 
-SRCREV_BUILDROOT = "619ca89fcd4a832445db67ee890398141b70196f"
+SRCREV_BUILDROOT = "ad7828b1e09e7f780779934c65620c8f271b8220"
 SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git;protocol=https;branch=${BRANCH} \
             https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT}  \
             https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
@@ -25,7 +25,8 @@ SRC_URI[config.sha256sum] = "3343beaf711838e49f88cf5c30f2cab7d81f905cfd9e1ea9cba
 SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
 DTS_SHA256:cvwsoc-nexysa7 = "a3e66df00181ef8c208ddbd4adb80261782752826fe0d1b1c9a42cf60fa21e18"
 DTS_SHA256:cvwsoc-genesys2 = "eacd0903402338c7d8f7d5caa64d01086a3be6f070dc9942db48cd7b9d87f3ed"
-DTS_SHA256:cvwsoc-virt = "6b30cf79d0aa46d7dce34d829d41eb6549371c32509201343cce186ebc5230f1"
+DTS_SHA256:cvwsoc-virt = "d1ef262492ba204b9d2eda0afbe99b80ea752141e3b4756795740b8d1c96fde2"
+DTS_SHA256:cvwsoc-virt32 = "d843b70589f26504a917290c4d2c3b6102603c393100d32afded9316557fdace"
 
 # tiny Kernel
 SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
@@ -49,6 +50,7 @@ SRCREV = "adc218676eef25575469234709c2d87185ca223a"
 SRC_URI:append:cvwsoc-nexysa7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-genesys2 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-virt = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvw-wally-dtb.patch', '', d)}"
+SRC_URI:append:cvwsoc-virt32 = " file://fragment-rv32.cfg ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-virt32-dtb.patch', '', d)}"
 
 # FIXME: this driver still needs improvements
 SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a19704700adc0b0ed282.patch \
