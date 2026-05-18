@@ -1,0 +1,17 @@
+Override genesys2 DTB with genesys2xc7 one.
+
+Upstream-Status: Pending
+
+diff --git a/configs/openhwgroup_cvwsoc_genesys2_defconfig b/configs/openhwgroup_cvwsoc_genesys2_defconfig
+index 8051c0d953d..806c59e3495 100644
+--- a/configs/openhwgroup_cvwsoc_genesys2_defconfig
++++ b/configs/openhwgroup_cvwsoc_genesys2_defconfig
+@@ -4,7 +4,7 @@ CONFIG_SYS_MALLOC_LEN=0x800000
+ CONFIG_SYS_BOOTM_LEN=0x3000000
+ CONFIG_HAS_CUSTOM_SYS_INIT_SP_ADDR=y
+ CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x82000000
+-CONFIG_DEFAULT_DEVICE_TREE="cvwsoc-genesys2"
++CONFIG_DEFAULT_DEVICE_TREE="cvwsoc-genesys2xc7"
+ CONFIG_SYS_LOAD_ADDR=0x80200000
+ CONFIG_TARGET_OPENHWGROUP_CVWSOC_GENESYS2=y
+ CONFIG_ARCH_RV64I=y

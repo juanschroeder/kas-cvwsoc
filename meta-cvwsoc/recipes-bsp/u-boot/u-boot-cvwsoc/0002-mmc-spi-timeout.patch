@@ -1,0 +1,23 @@
+
+Reduce MMC over SPI timeouts which are too much for
+slow CPUs and in error conditions.
+
+Upstream-Status: Pending
+
+diff --git a/drivers/mmc/mmc_spi.c b/drivers/mmc/mmc_spi.c
+index 675e642efd0..3590195aad6 100644
+--- a/drivers/mmc/mmc_spi.c
++++ b/drivers/mmc/mmc_spi.c
+@@ -57,9 +57,9 @@
+ 
+ /* timeout value */
+ #define CMD_TIMEOUT			8
+-#define READ_TIMEOUT			3000000 /* 1 sec */
+-#define WRITE_TIMEOUT			3000000 /* 1 sec */
+-#define R1B_TIMEOUT			3000000 /* 1 sec */
++#define READ_TIMEOUT			30000 /* ?? sec */
++#define WRITE_TIMEOUT			30000 /* ?? sec */
++#define R1B_TIMEOUT			30000 /* ?? sec */
+ 
+ struct mmc_spi_plat {
+ 	struct mmc_config cfg;

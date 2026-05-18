@@ -14,7 +14,7 @@ DEPENDS += "u-boot-tools-native"
 BRANCH = "master"
 KBUILD_DEFCONFIG ?= "linux.soc.config"
 
-SRCREV_BUILDROOT = "ad7828b1e09e7f780779934c65620c8f271b8220"
+SRCREV_BUILDROOT = "39cb0f3df82f71ab037688cbef72f1f6c1e01eff"
 SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git;protocol=https;branch=${BRANCH} \
             https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT}  \
             https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
@@ -24,7 +24,8 @@ SRC_URI[config.sha256sum] = "3343beaf711838e49f88cf5c30f2cab7d81f905cfd9e1ea9cba
 
 SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
 DTS_SHA256:cvwsoc-nexysa7 = "a3e66df00181ef8c208ddbd4adb80261782752826fe0d1b1c9a42cf60fa21e18"
-DTS_SHA256:cvwsoc-genesys2 = "eacd0903402338c7d8f7d5caa64d01086a3be6f070dc9942db48cd7b9d87f3ed"
+DTS_SHA256:cvwsoc-genesys2 = "06b14c486bcb936d2b268d0f7e51dd35ec32a8be0ab8b6ccd04ea63b6203fc1f"
+DTS_SHA256:cvwsoc-genesys2xc7 = "8c364ad42923b565884cef45363ae180979c9685b86bd73d63a9d7f8dbf0f411"
 DTS_SHA256:cvwsoc-virt = "d1ef262492ba204b9d2eda0afbe99b80ea752141e3b4756795740b8d1c96fde2"
 DTS_SHA256:cvwsoc-virt32 = "d843b70589f26504a917290c4d2c3b6102603c393100d32afded9316557fdace"
 
