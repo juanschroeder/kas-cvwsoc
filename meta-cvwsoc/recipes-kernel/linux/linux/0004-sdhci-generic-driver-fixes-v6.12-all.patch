@@ -4,10 +4,10 @@ this Kernel version.
 Upstream-Status: Pending
 
 diff --git a/drivers/mmc/host/sdhci-generic.c b/drivers/mmc/host/sdhci-generic.c
-index b2a4b63ca9a0..7d16a5ce77f7 100644
+index b2a4b63ca9a0..b1b45d37593a 100644
 --- a/drivers/mmc/host/sdhci-generic.c
 +++ b/drivers/mmc/host/sdhci-generic.c
-@@ -18,16 +18,16 @@
+@@ -18,29 +18,29 @@
  
  #include "sdhci-pltfm.h"
  
@@ -34,6 +34,21 @@ index b2a4b63ca9a0..7d16a5ce77f7 100644
  
  static u32 sdhci_generic_readl_no_fence(struct sdhci_host *host, int reg)
  {
+ 	// CVA6 has fences that take ~500 cycles and a LSU that
+ 	// does not parallelize on io addresses
+-	return *(volatile u32*)(host->ioaddr + reg);
++	return readl_relaxed(host->ioaddr + reg);
+ }
+ 
+ static void sdhci_generic_writel_no_fence(struct sdhci_host *host, u32 val, int reg)
+ {
+ 	// CVA6 has fences that take ~500 cycles and a LSU that
+ 	// does not parallelize on io addresses
+-	*(volatile u32*)(host->ioaddr + reg) = val;
++	writel_relaxed(val, host->ioaddr + reg);
+ }
+ 
+ static const struct sdhci_ops sdhci_generic_ops = {
 @@ -53,6 +53,7 @@ static const struct sdhci_ops sdhci_generic_ops = {
  };
  

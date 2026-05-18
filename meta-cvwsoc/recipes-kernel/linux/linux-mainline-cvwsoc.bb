@@ -49,12 +49,13 @@ LINUX_VERSION = "6.12"
 SRCREV = "adc218676eef25575469234709c2d87185ca223a"
 SRC_URI:append:cvwsoc-nexysa7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-genesys2 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2-dtb.patch', '', d)}"
+SRC_URI:append:cvwsoc-genesys2xc7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2xc7-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-virt = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvw-wally-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-virt32 = " file://fragment-rv32.cfg ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-virt32-dtb.patch', '', d)}"
 
 # FIXME: this driver still needs improvements
 SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a19704700adc0b0ed282.patch \
-                    file://0004-sdhci-generic-driver-fixes-v6.12.patch \
+                    file://0004-sdhci-generic-driver-fixes-v6.12-all.patch \
                 "
 
 COMPATIBLE_MACHINE = "(cvwsoc)"
