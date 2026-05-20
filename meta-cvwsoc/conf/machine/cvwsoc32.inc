@@ -13,7 +13,5 @@ TUNE_FEATURES = "rv 32 i m a f d c zicsr zifencei zicbom zicboz zba zbb zbc zbs"
 DEFAULTTUNE = "riscv32"
 
 
-# REMOVE THIS!!!
-EXTRA_IMAGEDEPENDS:remove = "u-boot-cvwsoc"
 
 UBOOT_ENTRYPOINT:riscv32 = "0x80200000"
