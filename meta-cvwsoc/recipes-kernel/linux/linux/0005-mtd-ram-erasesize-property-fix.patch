@@ -1,0 +1,36 @@
+Fix on mtd-ram driver to make it read erase-size
+from DTB.
+
+Upstream-Status: Pending
+
+diff --git a/drivers/mtd/chips/map_ram.c b/drivers/mtd/chips/map_ram.c
+index f9d3e32ef8e9..044458f56307 100644
+--- a/drivers/mtd/chips/map_ram.c
++++ b/drivers/mtd/chips/map_ram.c
+@@ -32,6 +32,15 @@ static struct mtd_chip_driver mapram_chipdrv = {
+ 	.module	= THIS_MODULE
+ };
+ 
++static unsigned int default_erasesize(struct map_info *map)
++{
++	const __be32 *erase_size = NULL;
++
++	erase_size = of_get_property(map->device_node, "erase-size", NULL);
++
++	return !erase_size ? map->size : be32_to_cpu(*erase_size);
++}
++
+ static struct mtd_info *map_ram_probe(struct map_info *map)
+ {
+ 	struct mtd_info *mtd;
+@@ -80,9 +89,7 @@ static struct mtd_info *map_ram_probe(struct map_info *map)
+ 		mtd->_unpoint = mapram_unpoint;
+ 	}
+ 
+-	mtd->erasesize = PAGE_SIZE;
+- 	while(mtd->size & (mtd->erasesize - 1))
+-		mtd->erasesize >>= 1;
++	mtd->erasesize = default_erasesize(map);
+ 
+ 	__module_get(THIS_MODULE);
+ 	return mtd;
