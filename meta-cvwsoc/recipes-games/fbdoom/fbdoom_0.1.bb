@@ -18,14 +18,21 @@ SECURITY_LDFLAGS = ""
 TARGET_CFLAGS = ""
 TARGET_CPPFLAGS = ""
 
-EXTRA_OEMAKE = '\
-  CC="${CC}" \
-  CFLAGS="-O3 -flto -march=rv64gc -mabi=lp64d \
+EXTRA_OEMAKE:cvwsoc64 = '\
+    CC="${CC}" \
+    CFLAGS="-O3 -flto -march=rv64gc -mabi=lp64d \
           -fno-exceptions -fno-asynchronous-unwind-tables \
           -fno-unwind-tables -fomit-frame-pointer -std=c99 -D_GNU_SOURCE" \
-  LDFLAGS="${LDFLAGS}" \
-'
+    LDFLAGS="${LDFLAGS}" \
+    '
 
+EXTRA_OEMAKE:cvwsoc32 = '\
+    CC="${CC}" \
+    CFLAGS="-O3 -flto -march=rv32gc -mabi=ilp32d \
+          -fno-exceptions -fno-asynchronous-unwind-tables \
+          -fno-unwind-tables -fomit-frame-pointer -std=c99 -D_GNU_SOURCE" \
+    LDFLAGS="${LDFLAGS}" \
+    '
 
 do_compile() {
     cd ${S}/fbdoom

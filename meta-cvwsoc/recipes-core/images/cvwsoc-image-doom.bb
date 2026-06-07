@@ -16,9 +16,11 @@ IMAGE_INSTALL += " \
     iputils \
     usbutils \
     htop \
-    strace \
     iperf3 \
     "
+
+# strace does not support RV32
+IMAGE_INSTALL:append:cvwsoc64 = " strace "
 
 # Doom and graphics related
 IMAGE_INSTALL += " \
@@ -26,3 +28,4 @@ IMAGE_INSTALL += " \
     fbdoom \
     freedm \
     "
+

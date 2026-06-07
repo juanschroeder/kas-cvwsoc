@@ -1,0 +1,52 @@
+Bugfixes on usb descriptors handling and dcache.
+
+Upstream-Status: Pending
+
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index 1d6711ccec4..169ad3809b2 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -657,9 +657,11 @@ static int ep_link(ohci_t *ohci, ed_t *edi)
+ 		flush_dcache_ed(ed);
+ 		if (ohci->ed_controltail == NULL)
+ 			ohci_writel((uintptr_t)ed, &ohci->regs->ed_controlhead);
+-		else
++		else {
+ 			ohci->ed_controltail->hwNextED =
+ 						   m32_swap((unsigned long)ed);
++			flush_dcache_ed(ohci->ed_controltail);
++		}
+ 
+ 		ed->ed_prev = ohci->ed_controltail;
+ 		if (!ohci->ed_controltail && !ohci->ed_rm_list[0] &&
+@@ -675,9 +677,11 @@ static int ep_link(ohci_t *ohci, ed_t *edi)
+ 		flush_dcache_ed(ed);
+ 		if (ohci->ed_bulktail == NULL)
+ 			ohci_writel((uintptr_t)ed, &ohci->regs->ed_bulkhead);
+-		else
++		else {
+ 			ohci->ed_bulktail->hwNextED =
+ 						   m32_swap((unsigned long)ed);
++			flush_dcache_ed(ohci->ed_bulktail);
++		}
+ 
+ 		ed->ed_prev = ohci->ed_bulktail;
+ 		if (!ohci->ed_bulktail && !ohci->ed_rm_list[0] &&
+@@ -771,7 +775,7 @@ static int ep_unlink(ohci_t *ohci, ed_t *edi)
+ 		}
+ 		if (ohci->ed_controltail == ed) {
+ 			ohci->ed_controltail = ed->ed_prev;
+-		} else {
++		} else  if (ed->hwNextED) {
+ 			((ed_t *)(uintptr_t)m32_swap(
+ 			    *((__u32 *)&ed->hwNextED)))->ed_prev = ed->ed_prev;
+ 		}
+@@ -792,7 +796,7 @@ static int ep_unlink(ohci_t *ohci, ed_t *edi)
+ 		}
+ 		if (ohci->ed_bulktail == ed) {
+ 			ohci->ed_bulktail = ed->ed_prev;
+-		} else {
++		} else if (ed->hwNextED) {
+ 			((ed_t *)(uintptr_t)m32_swap(
+ 			     *((__u32 *)&ed->hwNextED)))->ed_prev = ed->ed_prev;
+ 		}
