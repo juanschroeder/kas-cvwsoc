@@ -1,0 +1,13 @@
+diff --git a/conf/layer.conf b/conf/layer.conf
+index 4691fc3..ed63e3b 100644
+--- a/conf/layer.conf
++++ b/conf/layer.conf
+@@ -14,7 +14,7 @@ BBFILE_PRIORITY_doom = "10"
+ # This should only be incremented on significant changes that will
+ # cause compatibility issues with other layers
+ LAYERVERSION_doom = "1"
+-LAYERSERIES_COMPAT_doom = "mickledore nanbield"
++LAYERSERIES_COMPAT_doom = "mickledore nanbield whinlatter"
+ LAYERDEPENDS_doom = "core openembedded-layer"
+ 
+ # Prevent the native versions of the zdoom recipes from figuring into the task
