@@ -1,0 +1,53 @@
+Force restore initial keyboard mode on exit and signals.
+
+Upstream-Status: Pending
+
+diff --git a/fbdoom/i_input_tty.c b/fbdoom/i_input_tty.c
+index 95e1b60..475df53 100644
+--- a/fbdoom/i_input_tty.c
++++ b/fbdoom/i_input_tty.c
+@@ -28,6 +28,7 @@
+ #include <sys/ioctl.h>
+ #include <linux/keyboard.h>
+ #include <linux/kd.h>
++#include <signal.h>
+ 
+ #include "config.h"
+ #include "deh_str.h"
+@@ -274,6 +275,21 @@ void kbd_shutdown(void)
+     exit(0);
+ }
+ 
++static void kbd_restore(void)
++{
++    if (old_mode != -1 && kb >= 0) {
++        ioctl(kb, KDSKBMODE, old_mode);
++        tcsetattr(kb, TCSANOW, &old_term);
++        old_mode = -1;
++    }
++}
++
++static void kbd_signal_handler(int sig)
++{
++    kbd_restore();
++    _exit(128 + sig);
++}
++
+ static int kbd_init(void)
+ {
+     struct termios new_term;
+@@ -353,6 +369,14 @@ static int kbd_init(void)
+     flags = fcntl(kb, F_GETFL, 0);
+     fcntl(kb, F_SETFL, flags | O_NONBLOCK);
+ 
++
++    atexit(kbd_restore);
++
++    signal(SIGINT,  kbd_signal_handler);
++    signal(SIGTERM, kbd_signal_handler);
++    signal(SIGHUP,  kbd_signal_handler);
++    signal(SIGQUIT, kbd_signal_handler);
++
+     printf("Ready to read keycodes. Press Backspace to exit.\n");
+ 
+     return 0;

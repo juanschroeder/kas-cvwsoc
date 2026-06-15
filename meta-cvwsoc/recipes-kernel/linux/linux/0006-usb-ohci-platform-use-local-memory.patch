@@ -1,0 +1,73 @@
+Setup a local DMA memory region for the OHCI platform driver, if specified
+from DTB.
+
+Upstream-Status: Pending
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CVW SoC <cvwsoc@openhwgroup.org>
+Date: Fri, 12 Jun 2026 00:00:00 +0200
+Subject: [PATCH] usb: ohci-platform: use reserved memory as local DMA memory
+
+Allow a generic OHCI controller to use an optional reserved-memory region
+as local DMA memory.  The USB core then allocates OHCI data structures from
+the region and bounces setup and transfer buffers through it.
+
+Signed-off-by: CVW SoC <cvwsoc@openhwgroup.org>
+---
+ drivers/usb/host/ohci-platform.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
+index 4a8459f6f6f2..da2fb546c934 100644
+--- a/drivers/usb/host/ohci-platform.c
++++ b/drivers/usb/host/ohci-platform.c
+@@ -22,6 +22,7 @@
+ #include <linux/module.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
++#include <linux/of_reserved_mem.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+@@ -87,6 +88,26 @@ static struct usb_ohci_pdata ohci_platform_defaults = {
+ 	.power_off =		ohci_platform_power_off,
+ };
+ 
++static int ohci_platform_setup_local_mem(struct platform_device *pdev,
++					 struct usb_hcd *hcd)
++{
++	struct device_node *mem_node;
++	struct reserved_mem *rmem;
++
++	mem_node = of_parse_phandle(pdev->dev.of_node, "memory-region", 0);
++	if (!mem_node)
++		return 0;
++
++	rmem = of_reserved_mem_lookup(mem_node);
++	of_node_put(mem_node);
++	if (!rmem)
++		return dev_err_probe(&pdev->dev, -EINVAL,
++				     "invalid reserved memory region\n");
++
++	return usb_hcd_setup_local_mem(hcd, rmem->base, rmem->base,
++				       rmem->size);
++}
++
+ static int ohci_platform_probe(struct platform_device *dev)
+ {
+ 	struct usb_hcd *hcd;
+@@ -210,6 +233,12 @@ static int ohci_platform_probe(struct platform_device *dev)
+ 
+ 	hcd->tpl_support = of_usb_host_tpl_support(dev->dev.of_node);
+ 
++	err = ohci_platform_setup_local_mem(dev, hcd);
++	if (err) {
++		dev_err_probe(&dev->dev, err, "failed to set up local DMA memory\n");
++		goto err_power;
++	}
++
+ 	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (err)
+ 		goto err_power;
+-- 
+2.43.0

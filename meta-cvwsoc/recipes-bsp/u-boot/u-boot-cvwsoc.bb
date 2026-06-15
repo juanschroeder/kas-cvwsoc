@@ -3,7 +3,7 @@ require recipes-bsp/u-boot/u-boot-common.inc
 
 DEPENDS += "u-boot-tools-native"
 
-SRCREV:cvwsoc = "fc71894d0d906659f43c45e2a60a40dcfd3c66e2"
+SRCREV:cvwsoc = "52dd874af6bb5a4e039757a0312fb25bdeaa62e5"
 
 
 FILESEXTRAPATHS:prepend := "${THISDIR}:${PN}:"

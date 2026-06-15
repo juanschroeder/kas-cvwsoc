@@ -6,10 +6,23 @@ PRIORITY = "optional"
 LICENSE = "CLOSED"
 #LIC_FILES_CHKSUM = "file://COPYING.txt;md5=f4bc057015de5afef5e56f1cd5dfbae1"
 
+
+inherit pkgconfig
+
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
-SRC_URI = "git://github.com/maximevince/fbdoom.git;protocol=https;branch=master \
-            file://0001-patch-backbuffer-path.patch \
-            "
+SRC_URI = "git://github.com/maximevince/fbdoom.git;protocol=https;branch=master "
+SRC_URI:append:cvwsoc64 = "file://0001-patch-backbuffer-path.patch "
+SRC_URI:append:cvwsoc32 = "file://0001-patch-backbuffer-path.patch "
+# this patch ended up making the run a bit slower
+#SRC_URI:append:cvwsoc32 = "file://0001-patch-backbuffer-path-32b.patch "
+SRC_URI:append = "  file://0002-enable-sound.patch \
+                    file://0004-2chan.patch \
+                    file://0005-bugfix-kbd-restore.patch \
+                 "
+
+# This patch is not useful unless used with a 22 KHz capable sound card (and it introduces rate conversion)
+#                    file://0003-samplerate_22KHz.patch 
+
 SRCREV = "6c599f50e9e8e9436a5c064f42836eb48ff6bde0"
 SRC_URI[sha256sum] = "bdfe857256245da04fd38a19f4d3bff1b6d9971def7c06e246340a69057586ba"
 
@@ -34,10 +47,13 @@ EXTRA_OEMAKE:cvwsoc32 = '\
     LDFLAGS="${LDFLAGS}" \
     '
 
+DEPENDS += "libsdl libsdl-mixer"
+RDEPENDS:${PN} += "libsdl libsdl-mixer"
+
 do_compile() {
     cd ${S}/fbdoom
     oe_runmake clean
-    oe_runmake NOSDL=1 V=1    
+    oe_runmake FEATURE_SOUND=1 FEATURE_MUSIC=0 V=1
 }
 
 do_install() {
