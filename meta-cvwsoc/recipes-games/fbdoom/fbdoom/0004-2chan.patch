@@ -1,0 +1,18 @@
+Set 2 channels
+
+Upstream-Status: Pending
+
+diff --git a/fbdoom/s_sound.c b/fbdoom/s_sound.c
+index f6d8be1..4d2b6a3 100644
+--- a/fbdoom/s_sound.c
++++ b/fbdoom/s_sound.c
+@@ -103,7 +103,8 @@ static musicinfo_t *mus_playing = NULL;
+ 
+ // Number of channels to use
+ 
+-int snd_channels = 8;
++//int snd_channels = 8;
++int snd_channels = 2;
+ 
+ //
+ // Initializes sound stuff, including volume

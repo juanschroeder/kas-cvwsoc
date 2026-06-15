@@ -11,24 +11,34 @@ FILESEXTRAPATHS =. "${THISDIR}/linux:"
 # FIXME: put in machine conf?
 CVWSOC_DTS = "${CVWSOC_DTS_FILENAME}.dts"
 DEPENDS += "u-boot-tools-native"
-BRANCH = "master"
+BRANCH = "linux-6.12.y"
 KBUILD_DEFCONFIG ?= "linux.soc.config"
 
-SRCREV_BUILDROOT = "e068842209ab3c180cc4636a2a0b9c331705137d"
-SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git;protocol=https;branch=${BRANCH} \
-            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT}  \
-            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
+SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protocol=https;branch=${BRANCH} \
+           https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} \
+           https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
           "
+SRCREV_BUILDROOT = "d22961130270e904c5695492eab5e675314c5214"
+SRCREV = "1d3a00d3bacff25652c96e1527610c69e91f7c38"
+PV = "6.12.93+git"
+LINUX_VERSION = "6.12"
+SRCREV = "1d3a00d3bacff25652c96e1527610c69e91f7c38"
 
-SRC_URI[config.sha256sum] = "3343beaf711838e49f88cf5c30f2cab7d81f905cfd9e1ea9cbae5cac4415329f"
+# LINUX_VERSION needed for PV in linux-mainline-common
+# FIXME: 6.19 is crashing on boot (check)
+# LINUX_VERSION = "6.19"
+# SRCREV = "05f7e89ab9731565d8a62e3b5d1ec206485eeb0b"
+
+SRC_URI[sha256sum] = "9108b4be5320017c147ef5b638f97f285c4fa3a6c0c6d14d1c00f25d12070471"
+SRC_URI[config.sha256sum] = "8eade6062d71cd60664f467fba6392501d3f5bcfa754c1f7d6796cec12ac7a9e"
 
 SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
-DTS_SHA256:cvwsoc-nexysa7 = "a3e66df00181ef8c208ddbd4adb80261782752826fe0d1b1c9a42cf60fa21e18"
-DTS_SHA256:cvwsoc-genesys2 = "6c55a48369bbb0647cc34f1bb1d536a80ce66e54ae889529e3c34daf980a0ff1"
-DTS_SHA256:cvwsoc-genesys2xc7 = "1eb0ea4344ff77ee0b3e5cf6d02be2e9097f973e593a71815f05f560839ab1e1"
-DTS_SHA256:cvwsoc-genesys2rv32 = "81cc51afebc57a1d417d4557f7a38a965c54a54c346388427fda6dc9e0aa3d03"
-DTS_SHA256:cvwsoc-virt = "67751a85504fe9fd05e4ff6085da4dd1994e28c26bcd2f1bead6fd66d0ec4dac"
-DTS_SHA256:cvwsoc-virt32 = "bebb96303c63391e11ad7ae7405d349b5601befac1360b7ec903218680e2a462"
+DTS_SHA256:cvwsoc-nexysa7 = "8d004000e2cdda8d48b68d4d672e69d3dcf4df1457d734750ee2605d92a24f2a"
+DTS_SHA256:cvwsoc-genesys2 = "9b1c74801afc8bc018c0eb592127518b8df90f0363827d117e8b840178b7b4be"
+DTS_SHA256:cvwsoc-genesys2xc7 = "e0afd354829d06bffb920d0d5f586749ed1235ecf38dfd82ba8cc7f577340ca0"
+DTS_SHA256:cvwsoc-genesys2rv32 = "b1595c7f1d453c889105d8b9080da67f9adaa890c767693252b917c8f2493479"
+DTS_SHA256:cvwsoc-virt = "fc9c72ad13ab865bc23f99ab6a9aafa890cae4a5acc558edde7c8416a2f8c750"
+DTS_SHA256:cvwsoc-virt32 = "b650c2278b42daf7768dfde6f0975af563fe00a2f85d8de5fa350ad27990c6f7"
 
 # tiny Kernel
 SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
@@ -38,14 +48,6 @@ SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
 
 
 
-# LINUX_VERSION needed for PV in linux-mainline-common
-# FIXME: 6.19 is crashing on boot (check)
-#LINUX_VERSION = "6.19"
-#SRCREV = "05f7e89ab9731565d8a62e3b5d1ec206485eeb0b"
-#LINUX_VERSION = "6.12.8" # 
-# SRCREV for v6.12
-LINUX_VERSION = "6.12"
-SRCREV = "adc218676eef25575469234709c2d87185ca223a"
 SRC_URI:append:cvwsoc-nexysa7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-genesys2 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-genesys2xc7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2xc7-dtb.patch', '', d)}"
@@ -68,7 +70,14 @@ SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
 SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a19704700adc0b0ed282.patch \
                    file://0004-sdhci-generic-driver-fixes-v6.12-all.patch \
                    file://0005-mtd-ram-erasesize-property-fix.patch \
+                   file://0006-usb-ohci-platform-use-local-memory.patch \
                 "
+
+
+SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
+                'file://fragment-usb-snd.cfg \
+                 file://fragment-kbd.cfg \
+                 file://fragment-fb-console.cfg', '', d)}"
 
 COMPATIBLE_MACHINE = "(cvwsoc)"
 

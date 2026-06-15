@@ -1,0 +1,31 @@
+set 22KHz sample rate for sound output in fbdoom
+
+Upstream-Status: Pending
+
+diff --git a/fbdoom/i_sdlsound.c b/fbdoom/i_sdlsound.c
+index 7089378..b6cd968 100644
+--- a/fbdoom/i_sdlsound.c
++++ b/fbdoom/i_sdlsound.c
+@@ -1000,7 +1000,8 @@ static boolean I_SDL_InitSound(boolean _use_sfx_prefix)
+         return false;
+     }
+ 
+-    if (Mix_OpenAudio(snd_samplerate, AUDIO_S16SYS, 2, GetSliceSize()) < 0)
++    //if (Mix_OpenAudio(snd_samplerate, AUDIO_S16SYS, 2, GetSliceSize()) < 0)
++    if (Mix_OpenAudio(44100, AUDIO_S16SYS, 2, 8192) < 0)
+     {
+         fprintf(stderr, "Error initialising SDL_mixer: %s\n", Mix_GetError());
+         return false;
+diff --git a/fbdoom/i_sound.c b/fbdoom/i_sound.c
+index 5fee051..5fcf858 100644
+--- a/fbdoom/i_sound.c
++++ b/fbdoom/i_sound.c
+@@ -36,7 +36,7 @@
+ 
+ // Sound sample rate to use for digital output (Hz)
+ 
+-int snd_samplerate = 44100;
++int snd_samplerate = 44100 ;
+ 
+ // Maximum number of bytes to dedicate to allocated sound effects.
+ // (Default: 64MB)
