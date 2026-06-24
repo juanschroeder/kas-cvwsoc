@@ -1,0 +1,46 @@
+iDMA driver for dmaengine and 'idma-proxy' for userspace ioctls.
+Base taken from https://github.com/pulp-platform/cheshire/pull/183
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/drivers/dma/idma-engine.c b/drivers/dma/idma-engine.c
+index 76043f6ac7c7..f09742a0f83b 100644
+--- a/drivers/dma/idma-engine.c
++++ b/drivers/dma/idma-engine.c
+@@ -24,6 +24,12 @@
+ #include "dmaengine.h"
+ #include "virt-dma.h"
+ 
++/*
++ * For readq() and writeq() on 32-bit builds. First hi then lo.
++ */
++#include <linux/io-64-nonatomic-hi-lo.h>
++
++
+ #define IIS_IDMA_MAX_LENGTH_PER_TRANSFER 0xffffffffull
+ #define IIS_IDMA_AXI_ID 0xff
+ #define IIS_IDMA_AXI_FIXED 0x0
+diff --git a/drivers/dma/idma-proxy.c b/drivers/dma/idma-proxy.c
+index f50160d5e571..40e92aa4951a 100644
+--- a/drivers/dma/idma-proxy.c
++++ b/drivers/dma/idma-proxy.c
+@@ -193,7 +193,7 @@ static inline int destruct_idma_port_for_type(struct idma_port *port)
+                 void *virt_addr = phys_to_virt(port->phys_addr);
+                 if (!virt_addr)
+                 {
+-                        pr_err("Failed to convert physical address %llx to virtual address\n", port->phys_addr);
++                        pr_err("Failed to convert physical address %llx to virtual address\n", (u64) port->phys_addr);
+                         return -EFAULT;
+                 }
+                 ret = copy_to_user((void __user *)port->addr, virt_addr, port->length);
+@@ -277,7 +277,7 @@ static int start_idma_transfer(struct idma_proxy_channel *proxy_chan, struct idm
+                 return ret;
+         }
+         pr_debug("Prepared source address %lx (phys: %llx) and destination address %lx (phys: %llx)\n",
+-                transfer->src, proxy_chan->src_port.phys_addr, transfer->dst, proxy_chan->dst_port.phys_addr);
++                transfer->src, (u64)proxy_chan->src_port.phys_addr, transfer->dst, (u64)proxy_chan->dst_port.phys_addr);
+ 
+         chan_desc = dma_device->device_prep_dma_memcpy(proxy_chan->chan,
+                                                        proxy_chan->dst_port.phys_addr,

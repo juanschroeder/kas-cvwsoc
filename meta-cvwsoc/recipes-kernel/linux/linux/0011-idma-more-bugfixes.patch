@@ -1,0 +1,75 @@
+idma driver bugfixes.
+
+- with loop counter in try_get_first_uncached()
+- DMA_MEMCPY: set axi cache as modifiable
+- missing src/dest increment in iis_idma_prep_memcpy()
+- wrong call to vchan_tx_prep() in iis_idma_prep_memcpy()
+
+One remaining bugfix not splitted it's later in the integration commit.
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/drivers/dma/idma-engine.c b/drivers/dma/idma-engine.c
+index c033fb1090c1..fc6ba0c72642 100644
+--- a/drivers/dma/idma-engine.c
++++ b/drivers/dma/idma-engine.c
+@@ -35,6 +35,7 @@
+ #define IIS_IDMA_AXI_FIXED 0x0
+ #define IIS_IDMA_AXI_INCR 0x1
+ #define IIS_IDMA_AXI_WRAP 0x2
++#define IIS_IDMA_AXI_CACHE_MODIFIABLE  0x2u
+ #define IIS_IDMA_SUPPORTED_ADDRESS_WIDTH (BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |  \
+                                           BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
+                                           BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
+@@ -132,9 +133,8 @@ static bool try_get_first_uncached(struct iis_idma_channel *chan, struct iis_idm
+                         if (is_desc_completed(vdesc))
+                                 continue;
+                         sw_desc_cursor = to_idma_desc(vdesc);
+-                        for (i = sw_desc_cursor->n_hw_descs - 1;
+-                             i >= 0 && index_of_first_uncached > 0;
+-                             --i)
++                        for (i = sw_desc_cursor->n_hw_descs;
++                             i-- > 0 && index_of_first_uncached > 0;)
+                         {
+                                 if (le32_to_cpu(sw_desc_cursor->hw_descs[i]->flags) == (u32)~0)
+                                         break;
+@@ -395,8 +395,8 @@ static inline u32 iis_idma_flags(enum dma_transaction_type tx_type, bool do_inte
+         {
+         case DMA_MEMCPY:
+                 return IIS_IDMA_AXI_ID << 16 |
+-                       0 << 12 |
+-                       0 << 8 |
++                       IIS_IDMA_AXI_CACHE_MODIFIABLE << 12 | /* dst */
++                       IIS_IDMA_AXI_CACHE_MODIFIABLE << 8  | /* src */
+                        0 << 7 |
+                        1 << 6 |
+                        0 << 5 |
+@@ -453,7 +453,7 @@ iis_idma_prep_memcpy(struct dma_chan *chan, dma_addr_t dst,
+         struct iis_idma_channel *idma_chan;
+         size_t n_hw_descs;
+         size_t next_length;
+-        int i = 0;
++        size_t i = 0;
+ 
+         if (!chan || !len)
+                 return NULL;
+@@ -468,6 +468,8 @@ iis_idma_prep_memcpy(struct dma_chan *chan, dma_addr_t dst,
+         for (i = 0; i < n_hw_descs; ++i)
+         {
+                 next_length = min_t(size_t, len, IIS_IDMA_MAX_LENGTH_PER_TRANSFER);
++                src += next_length;
++                dst += next_length;
+                 len -= next_length;
+                 sw_desc->hw_descs[i]->length = cpu_to_le32(next_length);
+                 sw_desc->hw_descs[i]->flags = cpu_to_le32(iis_idma_flags(DMA_MEMCPY, i == n_hw_descs - 1));
+@@ -475,7 +477,7 @@ iis_idma_prep_memcpy(struct dma_chan *chan, dma_addr_t dst,
+                 sw_desc->hw_descs[i]->dst = cpu_to_le64((u64)dst);
+         }
+ 
+-        return vchan_tx_prep(&idma_chan->vc, &sw_desc->vd, flags);
++        return iis_idma_tx_prep(idma_chan, sw_desc, flags);
+ }
+ 
+ static int iis_idma_terminate_all(struct dma_chan *chan)

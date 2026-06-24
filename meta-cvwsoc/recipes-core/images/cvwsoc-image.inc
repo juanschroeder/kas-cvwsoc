@@ -18,5 +18,7 @@ EXTRA_USERS_PARAMS = "useradd cvw; \
 WKS_FILES:remove = "core-image-minimal.wks"
 WKS_FILE ?= "cvwsoc.wks.in"
 
+IMAGE_INSTALL:append = " kernel-modules"
+
 # Force u-boot deploy
 do_image[depends] += "virtual/bootloader:do_deploy"

@@ -1,0 +1,19 @@
+Missing spinlock init.
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/drivers/dma/idma-engine.c b/drivers/dma/idma-engine.c
+index f09742a0f83b..770e2922daf6 100644
+--- a/drivers/dma/idma-engine.c
++++ b/drivers/dma/idma-engine.c
+@@ -667,6 +667,8 @@ static int iis_idma_probe(struct platform_device *pdev)
+         if (IS_ERR(idma_dev->reg_base))
+                 return PTR_ERR(idma_dev->reg_base);
+ 
++        spin_lock_init(&idma_dev->current_channel_lock);
++
+         // register interrupt
+         irq = platform_get_irq(pdev, 0);
+         if (irq < 0)
