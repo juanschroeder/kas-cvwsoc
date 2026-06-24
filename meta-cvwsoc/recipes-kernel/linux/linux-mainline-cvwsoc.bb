@@ -18,7 +18,7 @@ SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protoc
            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} \
            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
           "
-SRCREV_BUILDROOT = "d22961130270e904c5695492eab5e675314c5214"
+SRCREV_BUILDROOT = "331a312cf24b1cc80a34fbd88aafddcbfc711b0d"
 SRCREV = "1d3a00d3bacff25652c96e1527610c69e91f7c38"
 PV = "6.12.93+git"
 LINUX_VERSION = "6.12"
@@ -34,10 +34,10 @@ SRC_URI[config.sha256sum] = "8eade6062d71cd60664f467fba6392501d3f5bcfa754c1f7d67
 
 SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
 DTS_SHA256:cvwsoc-nexysa7 = "8d004000e2cdda8d48b68d4d672e69d3dcf4df1457d734750ee2605d92a24f2a"
-DTS_SHA256:cvwsoc-genesys2 = "9b1c74801afc8bc018c0eb592127518b8df90f0363827d117e8b840178b7b4be"
+DTS_SHA256:cvwsoc-genesys2 = "5a34d739a73f635ca4d6ab1f2d69055a5703aad0b23198d601865468e31b3ecf"
 DTS_SHA256:cvwsoc-genesys2xc7 = "e0afd354829d06bffb920d0d5f586749ed1235ecf38dfd82ba8cc7f577340ca0"
-DTS_SHA256:cvwsoc-genesys2rv32 = "b1595c7f1d453c889105d8b9080da67f9adaa890c767693252b917c8f2493479"
-DTS_SHA256:cvwsoc-virt = "fc9c72ad13ab865bc23f99ab6a9aafa890cae4a5acc558edde7c8416a2f8c750"
+DTS_SHA256:cvwsoc-genesys2rv32 = "0e15aa66804292abe4816a28bfa64942ad9f6dd618b8deaaf562e964070d374f"
+DTS_SHA256:cvwsoc-virt = "f430363c1e6f060653c090b8f07c3d5948501b2f3eb424f8e35edccea98f0456"
 DTS_SHA256:cvwsoc-virt32 = "b650c2278b42daf7768dfde6f0975af563fe00a2f85d8de5fa350ad27990c6f7"
 
 # tiny Kernel
@@ -66,12 +66,26 @@ SRC_URI:append:cvwsoc-virt32 = " file://fragment-mtd-ram-jffs2.cfg \
 SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
                 ' file://fragment-reenable-fs.cfg ', '', d)}"
 
-# FIXME: this driver still needs improvements
+# FIXME: SDHCI driver still needs improvements
 SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a19704700adc0b0ed282.patch \
                    file://0004-sdhci-generic-driver-fixes-v6.12-all.patch \
                    file://0005-mtd-ram-erasesize-property-fix.patch \
                    file://0006-usb-ohci-platform-use-local-memory.patch \
                 "
+
+# iDMA patches
+SRC_URI:append = "  \
+                    file://0007-idma-base-cheshire-6.12-pr-driver.patch \
+                    file://0008-idma-first-rv32-bugfixes.patch \
+                    file://0009-idma-bugfix-mising-spinlock-init.patch \
+                    file://0010-idma-more-bugfixes-rv32.patch \
+                    file://0011-idma-more-bugfixes.patch \
+                    file://0012-idma-cvwsoc-customisations.patch \
+                    file://fragment-idma-engine-proxy.cfg \
+                "
+
+# dev
+# SRC_URI:append = " file://fragment-dev-remove-dirty.cfg "
 
 
 SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \

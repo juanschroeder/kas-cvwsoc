@@ -1,4 +1,4 @@
-Fixes on this driver that made it stable and compile for
+SDHCI: Fixes on this driver that made it stable and compile for
 this Kernel version.
 
 Upstream-Status: Pending
