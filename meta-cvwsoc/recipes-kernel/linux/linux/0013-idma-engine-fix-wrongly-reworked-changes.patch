@@ -1,0 +1,24 @@
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/drivers/dma/idma-engine.c b/drivers/dma/idma-engine.c
+index 5e4ef5383082..aef12b753095 100644
+--- a/drivers/dma/idma-engine.c
++++ b/drivers/dma/idma-engine.c
+@@ -570,13 +570,13 @@ iis_idma_prep_memcpy(struct dma_chan *chan, dma_addr_t dst,
+         for (i = 0; i < n_hw_descs; ++i)
+         {
+                 next_length = min_t(size_t, len, IIS_IDMA_MAX_LENGTH_PER_TRANSFER);
+-                src += next_length;
+-                dst += next_length;
+                 len -= next_length;
+                 sw_desc->hw_descs[i]->length = cpu_to_le32(next_length);
+                 sw_desc->hw_descs[i]->flags = cpu_to_le32(iis_idma_flags(DMA_MEMCPY, i == n_hw_descs - 1));
+                 sw_desc->hw_descs[i]->src = cpu_to_le64((u64)src);
+                 sw_desc->hw_descs[i]->dst = cpu_to_le64((u64)dst);
++                src += next_length;
++                dst += next_length;
+         }
+ 
+         return iis_idma_tx_prep(idma_chan, sw_desc, flags);

@@ -3,7 +3,7 @@ require recipes-bsp/u-boot/u-boot-common.inc
 
 DEPENDS += "u-boot-tools-native"
 
-SRCREV:cvwsoc = "775fafc4f4b760df25562e5fbaab26465ba73f1a"
+SRCREV:cvwsoc = "e180c309065f47fa1879a5faa139db5c34dbcace"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}:${PN}:"
 SRC_URI:cvwsoc = "git://github.com/juanschroeder/u-boot.git;protocol=https;nobranch=1"
