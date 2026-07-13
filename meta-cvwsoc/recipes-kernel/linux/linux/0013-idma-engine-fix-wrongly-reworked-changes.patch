@@ -1,3 +1,6 @@
+Fix wronly located addresses increment due to badly split patches when
+trying to separate the changes.
+
 Upstream-Status: Pending
 
 Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>

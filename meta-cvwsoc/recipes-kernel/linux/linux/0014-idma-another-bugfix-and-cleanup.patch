@@ -1,0 +1,62 @@
+Cleanup on hardcoded constants and bugfix for try_get_first_uncached().
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/drivers/dma/idma-engine.c b/drivers/dma/idma-engine.c
+index aef12b753095..7448f6eafb57 100644
+--- a/drivers/dma/idma-engine.c
++++ b/drivers/dma/idma-engine.c
+@@ -46,6 +46,9 @@
+                                           BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
+                                           BIT(DMA_SLAVE_BUSWIDTH_8_BYTES))
+ 
++#define IIS_IDMA_DESC_COMPLETED         (~0U) // 0xFFFFFFFF
++#define IIS_IDMA_DESC_LIST_LAST         (~0ULL)
++
+ #define IIS_IDMA_DESC_REG_IRQ_STATUS   0x100
+ #define IIS_IDMA_DESC_REG_IRQ_ENABLE   0x104
+ #define IIS_IDMA_DESC_IRQ_BIT      BIT(0)
+@@ -173,13 +176,13 @@ static inline struct iis_idma_sw_desc *to_idma_desc(struct virt_dma_desc *desc)
+ static inline bool is_desc_completed(struct virt_dma_desc *vd)
+ {
+         struct iis_idma_sw_desc *desc = to_idma_desc(vd);
+-        return desc->hw_descs[desc->n_hw_descs - 1]->flags == cpu_to_le32((u32)~0ULL);
++        return desc->hw_descs[desc->n_hw_descs - 1]->flags == cpu_to_le32(IIS_IDMA_DESC_COMPLETED);
+ }
+ 
+ static inline bool is_last_desc(struct virt_dma_desc *vd)
+ {
+         struct iis_idma_sw_desc *desc = to_idma_desc(vd);
+-        return desc->hw_descs[desc->n_hw_descs - 1]->next == cpu_to_le64(~0ull);
++        return desc->hw_descs[desc->n_hw_descs - 1]->next == cpu_to_le64(IIS_IDMA_DESC_LIST_LAST);
+ }
+ 
+ // idma_device.current_channel_lock must be held when calling this function,
+@@ -208,7 +211,7 @@ static bool try_get_first_uncached(struct iis_idma_channel *chan, struct iis_idm
+                         for (i = sw_desc_cursor->n_hw_descs;
+                              i-- > 0 && index_of_first_uncached > 0;)
+                         {
+-                                if (le32_to_cpu(sw_desc_cursor->hw_descs[i]->flags) == (u32)~0)
++                                if (le32_to_cpu(sw_desc_cursor->hw_descs[i]->flags) == IIS_IDMA_DESC_COMPLETED)
+                                         break;
+                                 --index_of_first_uncached;
+                         }
+@@ -218,6 +221,7 @@ static bool try_get_first_uncached(struct iis_idma_channel *chan, struct iis_idm
+                 spin_unlock_irqrestore(&chan_cursor->vc.lock, flags);
+                 if (chan_cursor == chan)
+                         break;
++                chan_cursor = chan_cursor->next;
+         }
+ 
+         if (index_of_first_uncached)
+@@ -420,7 +424,7 @@ static struct iis_idma_sw_desc *iis_idma_desc_alloc_and_chain(struct iis_idma_ch
+                                 &dma_addr);
+                 if (sw_desc->hw_descs[i] == NULL)
+                         goto err;
+-                sw_desc->hw_descs[i]->next = cpu_to_le64(~0ULL);
++                sw_desc->hw_descs[i]->next = cpu_to_le64(IIS_IDMA_DESC_LIST_LAST);
+                 if (i == 0)
+                 {
+                         sw_desc->first = dma_addr;

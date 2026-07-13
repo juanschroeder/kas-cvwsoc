@@ -1,0 +1,926 @@
+Cyclic DMA support and other changes.
+
+- changes to support DMA_CYCLIC for MEM_TO_DEV (no DEV_TO_MEM yet).
+- Tested with I2S and DAC, with 'speaker-test' or with 'fbdoom'.
+- 'dmatest' should still work for normal transfers but *NOT INTERLEAVED*
+  with Cyclic DMA running. This is a LIMITATION that will be fixed later.
+- Overall Cyclic DMA setup:
+    - cyclic descriptors are chained in a loop and processing continues
+      forever by default. Periods are split in transfers according to 
+      hardware buffering limitations.
+    - cyclic descriptor requests interrupt on every completion and prevent
+      the descriptors being written by hardware
+    - special care for cyclic->non-cyclic transitions
+    - stopping cyclic transfers needs specific operation, might need
+      some time and it's not synchronous
+- descriptor flags
+    - Descriptors sent to hardware should include src and dst protocol
+    - deburst bit used to split transfers into smaller chunks
+    - preserve bit used to prevent descriptor being written by hardware
+      on completion
+- STOP logic with cyclic control register to stop cyclic transfers
+- transfers for cyclic descriptors were eventually reduced in size not to
+  starve VGA requests (underrun) which are more hard realtime. To be reviewed
+  later
+- Many callbacks needed different cyclic/non-cyclic implementations
+- Bugfix on channel termination of not yet submitted channels
+- Some general cleanup included
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/drivers/dma/idma-engine.c b/drivers/dma/idma-engine.c
+index 7448f6eafb57..aba613113daf 100644
+--- a/drivers/dma/idma-engine.c
++++ b/drivers/dma/idma-engine.c
+@@ -1,6 +1,11 @@
+ // SPDX-License-Identifier: GPL-2.0
+ //
+ // Copyright (C) 2022 Axel Vanoni
++	// Copyright (C) 2026 Juan Schroeder
++//
++// This driver is for a AXI-AXI-Stream iDMA with Cyclic DMA support
++// See the iDMA fork at: https://github.com/juanschroeder/iDMA
++// Extra features on that implementation in CVWSoC: https://github.com/juanschroeder/cvw
+ 
+ #include "asm/mmio.h"
+ #include "linux/dmaengine.h"
+@@ -25,6 +30,7 @@
+ #include <linux/of.h>
+ #include <linux/of_reserved_mem.h>
+ #include <linux/wait.h>
++#include <linux/iopoll.h>
+ 
+ #include "dmaengine.h"
+ #include "virt-dma.h"
+@@ -34,6 +40,12 @@
+  */
+ #include <linux/io-64-nonatomic-hi-lo.h>
+ 
++//#define DEBUG
++
++#ifdef DEBUG
++#include <linux/ktime.h>
++#include <linux/math64.h>
++#endif
+ 
+ #define IIS_IDMA_MAX_LENGTH_PER_TRANSFER 0xffffffffull
+ #define IIS_IDMA_AXI_ID 0xff
+@@ -52,6 +64,32 @@
+ #define IIS_IDMA_DESC_REG_IRQ_STATUS   0x100
+ #define IIS_IDMA_DESC_REG_IRQ_ENABLE   0x104
+ #define IIS_IDMA_DESC_IRQ_BIT      BIT(0)
++#define IIS_IDMA_DESC_REG_CYCLIC_CTRL       0x110
++#define IIS_IDMA_DESC_REG_CYCLIC_STOP       0x1
++#define IIS_IDMA_DESC_REG_CYCLIC_RUNNING    0x2
++#define IIS_IDMA_DESC_REG_CYCLIC_STOPPED    0x4
++
++#define IIS_IDMA_DESC_FLAGS_PROTOCOL_SRC_BIT    24
++#define IIS_IDMA_DESC_FLAGS_PROTOCOL_DST_BIT    27
++#define IIS_IDMA_DESC_FLAGS_PRESERVE_BIT        30
++// Deburst: See src_max_llen/dst_max_llen
++#define IIS_IDMA_DESC_FLAGS_DEBURST_BIT           BIT(7)
++#define IIS_IDMA_DESC_FLAGS_SERIALIZE_BIT         BIT(6)
++#define IIS_IDMA_DESC_FLAGS_IRQ_BIT         BIT(0)
++
++#define IIS_IDMA_DESC_PROTOCOL_AXI          0x0
++#define IIS_IDMA_DESC_PROTOCOL_AXISTREAM    0x5
++
++#define IDMA_POLL_INTERVAL_USEC             1000
++#define IDMA_POLL_TIMEOUT                   1000000
++
++// Hardware limitation: bigger descriptors not accepted by hardware.
++// => See top file AudioFifoDepth
++#define IIS_IDMA_MAX_AXIS_DESC_BYTES        16328U
++
++#ifdef DEBUG
++#define IIS_IDMA_DBG_IRQ_SAMPLES            8
++#endif
+ 
+ struct iis_idma_hw_desc
+ {
+@@ -67,11 +105,15 @@ static_assert(sizeof(struct iis_idma_hw_desc) == 32);
+ struct iis_idma_channel
+ {
+         struct virt_dma_chan vc;
++        struct dma_slave_config	cfg;
+         struct iis_idma_device *parent;
+         struct dma_pool *pool;
+         struct iis_idma_channel *next;
+         bool is_terminated;
+         wait_queue_head_t wait_sync;
++        bool cyclic_active;
++        bool cyclic_stopping;
++        bool hw_submitted;
+ };
+ 
+ struct iis_idma_device
+@@ -100,6 +142,19 @@ struct iis_idma_sw_desc
+         struct gen_pool *local_desc_allocator;
+         dma_addr_t first;
+         int n_hw_descs;
++        bool is_cyclic;
++        u32 period_len;
++        u32 buf_len;
++        u32 n_periods;
++        u32 next_period;
++
++#ifdef DEBUG
++        u32 dbg_hw_periods;
++        u32 dbg_vchan_pending;
++        u64 dbg_irq_ts[IIS_IDMA_DBG_IRQ_SAMPLES];
++        u32 dbg_irq_count;
++#endif
++
+         struct iis_idma_hw_desc *hw_descs[];
+ };
+ 
+@@ -188,19 +243,20 @@ static inline bool is_last_desc(struct virt_dma_desc *vd)
+ // idma_device.current_channel_lock must be held when calling this function,
+ // but no virtual channel locks
+ // assumes that the channel is running
+-static bool try_get_first_uncached(struct iis_idma_channel *chan, struct iis_idma_sw_desc **out_sw, size_t *out_hw_index)
++/* This is a GUESS. */
++static bool try_get_first_non_prefetched(struct iis_idma_channel *chan, struct iis_idma_sw_desc **out_sw, size_t *out_hw_index)
+ {
+         struct iis_idma_device *idma_dev = chan->parent;
+         struct iis_idma_channel *chan_cursor = idma_dev->current_channel;
+         struct iis_idma_sw_desc *sw_desc_cursor;
+         struct virt_dma_desc *vdesc;
+         // We need to take the one after all the cache slots
+-        u32 index_of_first_uncached = idma_dev->hw_cache_slots + 1;
++        u32 index_of_first_non_prefetched = idma_dev->hw_cache_slots + 1;
+         unsigned long flags;
+         size_t i;
+ 
+         rmb();
+-        while (index_of_first_uncached)
++        while (index_of_first_non_prefetched)
+         {
+                 spin_lock_irqsave(&chan_cursor->vc.lock, flags);
+                 list_for_each_entry(vdesc, &chan_cursor->vc.desc_issued, node)
+@@ -209,13 +265,13 @@ static bool try_get_first_uncached(struct iis_idma_channel *chan, struct iis_idm
+                                 continue;
+                         sw_desc_cursor = to_idma_desc(vdesc);
+                         for (i = sw_desc_cursor->n_hw_descs;
+-                             i-- > 0 && index_of_first_uncached > 0;)
++                             i-- > 0 && index_of_first_non_prefetched > 0;)
+                         {
+                                 if (le32_to_cpu(sw_desc_cursor->hw_descs[i]->flags) == IIS_IDMA_DESC_COMPLETED)
+                                         break;
+-                                --index_of_first_uncached;
++                                --index_of_first_non_prefetched;
+                         }
+-                        if (index_of_first_uncached == 0)
++                        if (index_of_first_non_prefetched == 0)
+                                 break;
+                 }
+                 spin_unlock_irqrestore(&chan_cursor->vc.lock, flags);
+@@ -224,7 +280,7 @@ static bool try_get_first_uncached(struct iis_idma_channel *chan, struct iis_idm
+                 chan_cursor = chan_cursor->next;
+         }
+ 
+-        if (index_of_first_uncached)
++        if (index_of_first_non_prefetched)
+                 return false;
+ 
+         if (chan_cursor != chan)
+@@ -283,13 +339,38 @@ static void iis_idma_maybe_launch_channel(struct iis_idma_channel *channel, stru
+                 return;
+ 
+         tail = get_channels_tail(idma_dev);
+-        if (tail)
++        if (tail) {
+                 tail->next = channel;
+-        else
++                channel->cyclic_active = to_idma_desc(vd)->is_cyclic;
++
++                // do not submit non-cyclic -> cyclic transitions (delayed)
++                if (channel->cyclic_active || !tail->hw_submitted ||
++                    tail->cyclic_active) {
++                        channel->hw_submitted = false;
++                        // The writeq() submission call to Hw is skipped.
++                        // It is done later in the IRQ handler
++                        return;
++                }
++        } else {
+                 idma_dev->current_channel = channel;
++                channel->cyclic_active = to_idma_desc(vd)->is_cyclic;
++        }
++
++        channel->hw_submitted = true;
++        channel->cyclic_stopping = false;
++        channel->is_terminated = false;
++
++        if (to_idma_desc(vd)->is_cyclic) {
++                struct iis_idma_sw_desc *sw_desc = to_idma_desc(vd);
++
++                wmb();
++                writeq(sw_desc->first, idma_dev->reg_base);
++                return;
++        }
+ 
+         // make sure that descriptors are flushed to memory
+         wmb();
++        /* submit a new descriptor to hardware queue */
+         writeq(to_idma_desc(vd)->first, idma_dev->reg_base);
+ }
+ 
+@@ -302,6 +383,9 @@ static irqreturn_t iis_idma_interrupt(int irq, void *dev_id)
+         unsigned long vchan_flags;
+         bool switch_to_next_channel;
+         u32 irq_status;
++        struct iis_idma_sw_desc *sw_desc;
++        u32 cyclic_ctrl;
++        struct iis_idma_channel *next_channel;
+ 
+         // Read and clear IRQ status
+         irq_status = readl(idma_dev->reg_base + IIS_IDMA_DESC_REG_IRQ_STATUS);
+@@ -329,41 +413,84 @@ static irqreturn_t iis_idma_interrupt(int irq, void *dev_id)
+                 // we have a terminated channel
+                 goto err_unlock_vchan;
+ 
+-        WARN(!is_desc_completed(vd), "Driver and hardware are out-of-sync.");
+-        if (unlikely(!is_desc_completed(vd)))
+-                goto err_unlock_vchan;
++        sw_desc = to_idma_desc(vd);
+ 
+-        switch_to_next_channel = is_last_desc(vd);
++#ifdef DEBUG
++        if (sw_desc->is_cyclic &&
++            sw_desc->dbg_irq_count < IIS_IDMA_DBG_IRQ_SAMPLES)
++                sw_desc->dbg_irq_ts[sw_desc->dbg_irq_count++] =
++                        ktime_get_mono_fast_ns();
++#endif
+ 
+-        list_del(&vd->node);
+-        if (just_completed_chan->is_terminated)
++        if (!sw_desc->is_cyclic)
+         {
+-                vchan_vdesc_fini(vd);
++            WARN(!is_desc_completed(vd), "Driver and hardware are out-of-sync.");
++            if (unlikely(!is_desc_completed(vd)))
++                    goto err_unlock_vchan;
++
++            switch_to_next_channel = is_last_desc(vd);
++
++            list_del(&vd->node);
++            if (just_completed_chan->is_terminated)
++            {
++                    vchan_vdesc_fini(vd);
++            }
++            else
++            {
++                    vchan_cookie_complete(vd);
++            }
++
++            if (switch_to_next_channel)
++            {
++                    next_channel = just_completed_chan->next;
++
++                    just_completed_chan->hw_submitted = false;
++                    idma_dev->current_channel = next_channel;
++                    just_completed_chan->next = NULL;
++
++                    /* Check for previously skipped writeq() */
++                    if (next_channel && !next_channel->hw_submitted) {
++                            struct virt_dma_desc *next_vd;
++                            unsigned long next_flags;
++
++                            spin_lock_irqsave(&next_channel->vc.lock, next_flags);
++                            next_vd = vchan_next_desc(&next_channel->vc);
++                            if (next_vd) {
++                                    next_channel->hw_submitted = true;
++                                    wmb();
++                                    writeq(to_idma_desc(next_vd)->first,
++                                           idma_dev->reg_base);
++                            }
++                            spin_unlock_irqrestore(&next_channel->vc.lock, next_flags);
++                    }
++
++                    /* try to relaunch new stuff already in the completed channel */
++                    iis_idma_maybe_launch_channel(just_completed_chan, idma_dev);
++            }
+         }
+         else
+         {
+-                vchan_cookie_complete(vd);
+-        }
+ 
+-        if (switch_to_next_channel)
+-        {
+-                // update to point to the next channel
+-                if (just_completed_chan->next)
+-                {
+-                        idma_dev->current_channel = just_completed_chan->next;
+-                }
+-                else
+-                {
+-                        idma_dev->current_channel = NULL;
+-                }
+-                just_completed_chan->next = NULL;
+-        }
++            sw_desc->next_period++;
++            if (sw_desc->next_period == sw_desc->n_periods) //new cycle
++                sw_desc->next_period = 0;
+ 
+-        if (switch_to_next_channel)
+-        {
+-                // try to relaunch, if we have new things
+-                iis_idma_maybe_launch_channel(just_completed_chan, idma_dev);
++            cyclic_ctrl = readl(idma_dev->reg_base + IIS_IDMA_DESC_REG_CYCLIC_CTRL);
++            if (cyclic_ctrl & IIS_IDMA_DESC_REG_CYCLIC_RUNNING &&
++                !(just_completed_chan->cyclic_stopping))
++            {
++
++#ifdef DEBUG
++                sw_desc->dbg_hw_periods++;
++                if (just_completed_chan->vc.cyclic)
++                        sw_desc->dbg_vchan_pending++;
++#endif
++
++                /* completed period */
++                vchan_cyclic_callback(vd);
++            }
+         }
++
+         spin_unlock_irqrestore(&just_completed_chan->vc.lock, vchan_flags);
+         spin_unlock_irqrestore(&idma_dev->current_channel_lock, iis_channel_flags);
+ 
+@@ -400,7 +527,7 @@ static void iis_idma_desc_free(struct virt_dma_desc *vd)
+         kfree(sw_desc);
+ }
+ 
+-static struct iis_idma_sw_desc *iis_idma_desc_alloc_and_chain(struct iis_idma_channel *chan, int n_hw_descs)
++static struct iis_idma_sw_desc *iis_idma_desc_alloc_and_chain(struct iis_idma_channel *chan, int n_hw_descs, bool is_cyclic)
+ {
+         struct iis_idma_sw_desc *sw_desc;
+         int i;
+@@ -436,6 +563,9 @@ static struct iis_idma_sw_desc *iis_idma_desc_alloc_and_chain(struct iis_idma_ch
+                 sw_desc->n_hw_descs++;
+         }
+ 
++        if (is_cyclic)
++                sw_desc->hw_descs[n_hw_descs - 1]->next = cpu_to_le64(sw_desc->first);
++
+         INIT_LIST_HEAD(&sw_desc->vd.node);
+ 
+         return sw_desc;
+@@ -475,7 +605,8 @@ static void iis_idma_free_chan_resources(struct dma_chan *chan)
+         idma_chan->pool = NULL;
+ }
+ 
+-static inline u32 iis_idma_flags(enum dma_transaction_type tx_type, bool do_interrupt)
++static inline u32 iis_idma_flags(enum dma_transaction_type tx_type,
++    enum dma_transfer_direction direction,  bool do_interrupt)
+ {
+         // from the hw source:
+         // Flags for this request. Currently, the following are defined:
+@@ -495,6 +626,9 @@ static inline u32 iis_idma_flags(enum dma_transaction_type tx_type, bool do_inte
+         //                bit 2: cache read alloc
+         //                bit 3: cache write alloc
+         // bits 23:16     AXI ID used for the transfer
++        // bits 26:24     Source protocol for the transfer
++        // bits 29:27     Destination protocol for the transfer
++        // bits 30        Preserve descriptor: if set, the 'completed' flag is not written by hw after processing
+         // bits 31:24     unused/reserved
+ 
+         switch (tx_type)
+@@ -508,7 +642,48 @@ static inline u32 iis_idma_flags(enum dma_transaction_type tx_type, bool do_inte
+                        0 << 5 |
+                        IIS_IDMA_AXI_INCR << 3 |
+                        IIS_IDMA_AXI_INCR << 1 |
++                       IIS_IDMA_DESC_PROTOCOL_AXI << IIS_IDMA_DESC_FLAGS_PROTOCOL_SRC_BIT |
++                       IIS_IDMA_DESC_PROTOCOL_AXI << IIS_IDMA_DESC_FLAGS_PROTOCOL_DST_BIT |
+                        do_interrupt << 0;
++
++        case DMA_CYCLIC:
++        {
++            u32 direction_flags = 0;
++            u32 memory_flags = 0;
++            switch (direction)
++            {
++            case DMA_MEM_TO_DEV:
++                direction_flags = IIS_IDMA_DESC_PROTOCOL_AXI << IIS_IDMA_DESC_FLAGS_PROTOCOL_SRC_BIT |
++                                  IIS_IDMA_DESC_PROTOCOL_AXISTREAM << IIS_IDMA_DESC_FLAGS_PROTOCOL_DST_BIT;
++                memory_flags = IIS_IDMA_AXI_INCR << 1;
++
++                return
++                    direction_flags |
++                    memory_flags |
++                    IIS_IDMA_DESC_FLAGS_DEBURST_BIT | // deburst
++                    IIS_IDMA_DESC_FLAGS_SERIALIZE_BIT |
++                    BIT(IIS_IDMA_DESC_FLAGS_PRESERVE_BIT) |
++                    (do_interrupt ? IIS_IDMA_DESC_FLAGS_IRQ_BIT : 0);
++                break;
++            case DMA_DEV_TO_MEM:
++                direction_flags = IIS_IDMA_DESC_PROTOCOL_AXISTREAM << IIS_IDMA_DESC_FLAGS_PROTOCOL_SRC_BIT |
++                                  IIS_IDMA_DESC_PROTOCOL_AXI << IIS_IDMA_DESC_FLAGS_PROTOCOL_DST_BIT;
++                memory_flags = IIS_IDMA_AXI_INCR << 3;
++                /* FIXME: this is not supported yet */
++                break;
++            default:
++                // ERROR
++                break;
++            }
++                return IIS_IDMA_AXI_ID << 16 |
++                       0 << 7 |
++                       1 << 6 |
++                       0 << 5 |
++                       direction_flags |
++                       memory_flags |
++                       1 <<  IIS_IDMA_DESC_FLAGS_PRESERVE_BIT |
++                       do_interrupt << 0;
++        }
+         default:
+                 // ERROR
+                 break;
+@@ -525,16 +700,21 @@ iis_idma_tx_submit(struct dma_async_tx_descriptor *desc)
+         struct virt_dma_desc *vd;
+         unsigned long flags;
+ 
+-        // chain the last hw descriptor of the last submitted transfer
+-        // to the first hw descriptor of this new one
+-        spin_lock_irqsave(&chan->vc.lock, flags);
+-        if (!list_empty(&chan->vc.desc_submitted))
++        /* no chaining for cyclic case */
++        if (!sw_desc->is_cyclic)
+         {
+-                vd = list_last_entry(&chan->vc.desc_submitted, struct virt_dma_desc, node);
+-                prev_desc = to_idma_desc(vd);
+-                prev_desc->hw_descs[prev_desc->n_hw_descs - 1]->next = cpu_to_le64(sw_desc->first);
++            // chain the last hw descriptor of the last submitted transfer
++            // to the first hw descriptor of this new one
++            spin_lock_irqsave(&chan->vc.lock, flags);
++            if (!list_empty(&chan->vc.desc_submitted))
++            {
++                    vd = list_last_entry(&chan->vc.desc_submitted, struct virt_dma_desc, node);
++                    prev_desc = to_idma_desc(vd);
++                    prev_desc->hw_descs[prev_desc->n_hw_descs - 1]->next = cpu_to_le64(sw_desc->first);
++            }
++            spin_unlock_irqrestore(&chan->vc.lock, flags);
+         }
+-        spin_unlock_irqrestore(&chan->vc.lock, flags);
++
+         return vchan_tx_submit(desc);
+ }
+ 
+@@ -567,7 +747,7 @@ iis_idma_prep_memcpy(struct dma_chan *chan, dma_addr_t dst,
+         n_hw_descs = DIV_ROUND_UP(len, IIS_IDMA_MAX_LENGTH_PER_TRANSFER);
+         idma_chan = to_idma_chan(chan);
+ 
+-        sw_desc = iis_idma_desc_alloc_and_chain(idma_chan, n_hw_descs);
++        sw_desc = iis_idma_desc_alloc_and_chain(idma_chan, n_hw_descs, 0);
+         if (sw_desc == NULL)
+                 return NULL;
+ 
+@@ -576,7 +756,7 @@ iis_idma_prep_memcpy(struct dma_chan *chan, dma_addr_t dst,
+                 next_length = min_t(size_t, len, IIS_IDMA_MAX_LENGTH_PER_TRANSFER);
+                 len -= next_length;
+                 sw_desc->hw_descs[i]->length = cpu_to_le32(next_length);
+-                sw_desc->hw_descs[i]->flags = cpu_to_le32(iis_idma_flags(DMA_MEMCPY, i == n_hw_descs - 1));
++                sw_desc->hw_descs[i]->flags = cpu_to_le32(iis_idma_flags(DMA_MEMCPY, DMA_MEM_TO_MEM, i == n_hw_descs - 1));
+                 sw_desc->hw_descs[i]->src = cpu_to_le64((u64)src);
+                 sw_desc->hw_descs[i]->dst = cpu_to_le64((u64)dst);
+                 src += next_length;
+@@ -586,52 +766,238 @@ iis_idma_prep_memcpy(struct dma_chan *chan, dma_addr_t dst,
+         return iis_idma_tx_prep(idma_chan, sw_desc, flags);
+ }
+ 
++static struct dma_async_tx_descriptor *iis_idma_prep_dma_cyclic(
++                    struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
++                    size_t period_len, enum dma_transfer_direction direction,
++                    unsigned long flags)
++{
++        struct iis_idma_sw_desc *sw_desc;
++        struct iis_idma_channel *idma_chan;
++        size_t n_hw_descs;
++        size_t next_length;
++        size_t i = 0;
++
++        if (!chan || !buf_len || !period_len || buf_len % period_len)
++                return NULL;
++
++        /* DMA_DEV_TO_MEM unsupported for now */
++        if (direction != DMA_MEM_TO_DEV /*&& direction != DMA_MEM_TO_MEM*/)
++            return NULL;
++
++        if (period_len > IIS_IDMA_MAX_AXIS_DESC_BYTES)
++                return NULL;
++
++        n_hw_descs = DIV_ROUND_UP(buf_len, period_len);
++        idma_chan = to_idma_chan(chan);
++
++        sw_desc = iis_idma_desc_alloc_and_chain(idma_chan, n_hw_descs, 1);
++        if (sw_desc == NULL)
++                return NULL;
++
++
++        sw_desc->is_cyclic = true;
++        sw_desc->period_len = period_len;
++        sw_desc->buf_len = buf_len;
++        sw_desc->n_periods = buf_len / period_len;
++#ifdef DEBUG
++        sw_desc->dbg_hw_periods = 0;
++        sw_desc->dbg_vchan_pending = 0;
++#endif
++
++        dev_info(idma_chan->parent->dev,
++                "cyclic: buf=%pad buf_len=%zu period_len=%zu periods=%u hw_descs=%d\n",
++                &buf_addr, buf_len, period_len,
++                sw_desc->n_periods, sw_desc->n_hw_descs);
++
++        for (i = 0; i < n_hw_descs; ++i)
++        {
++                next_length = min_t(size_t, buf_len, period_len);
++                buf_len -= next_length;
++                sw_desc->hw_descs[i]->length = cpu_to_le32(next_length);
++                /* always interrupt on cyclic transfers, so we can update the current period */
++                sw_desc->hw_descs[i]->flags = cpu_to_le32(iis_idma_flags(DMA_CYCLIC, direction, 1));
++                if (direction == DMA_MEM_TO_DEV)
++                {
++                        sw_desc->hw_descs[i]->src = cpu_to_le64((u64)buf_addr);
++                        sw_desc->hw_descs[i]->dst = 0ULL;
++                }
++                /*
++                else if
++                {
++                        sw_desc->hw_descs[i]->src = 0ULL;
++                        sw_desc->hw_descs[i]->dst = cpu_to_le64((u64)buf_addr);
++                }
++                */
++                buf_addr += next_length;
++        }
++
++#ifdef DEBUG
++        pr_info("cyclic desc[0]: src=%#llx len=%u flags=%#x\n",
++                le64_to_cpu(sw_desc->hw_descs[0]->src),
++                le32_to_cpu(sw_desc->hw_descs[0]->length),
++                le32_to_cpu(sw_desc->hw_descs[0]->flags));
++#endif
++
++        return iis_idma_tx_prep(idma_chan, sw_desc, flags);
++}
++
++static int iis_idma_slave_config(struct dma_chan *chan,
++				    struct dma_slave_config *cfg)
++{
++    struct iis_idma_channel *idma_chan = to_idma_chan(chan);
++
++    idma_chan->cfg = *cfg;
++
++    return 0;
++}
++
+ static int iis_idma_terminate_all(struct dma_chan *chan)
+ {
+         struct iis_idma_channel *idma_chan = to_idma_chan(chan);
+         struct iis_idma_device *idma_dev = idma_chan->parent;
+-        struct iis_idma_sw_desc *uncached_sw;
++        struct iis_idma_sw_desc *non_prefetched_sw_desc;
++        struct virt_dma_desc *vd;
+ 
+-        size_t uncached_hw_index;
++        size_t non_prefetched_hw_index;
+         unsigned long iis_channel_flags;
+         unsigned long vchan_flags;
+-        LIST_HEAD(head);
++        LIST_HEAD(discard_list);
++        LIST_HEAD(keep_list);
+ 
+-        idma_chan->is_terminated = true;
++#ifdef DEBUG
++        u64 irq_ts[IIS_IDMA_DBG_IRQ_SAMPLES] = {};
++        u32 irq_count = 0;
++        int i;
++#endif
+ 
+-        // dequeue everything we can, but leave needed descriptors in the
+-        // queues for the irq handler.
+         spin_lock_irqsave(&idma_dev->current_channel_lock, iis_channel_flags);
+-        if (is_channel_running(idma_chan, idma_dev) &&
+-            try_get_first_uncached(idma_chan, &uncached_sw, &uncached_hw_index))
++        if (idma_chan->cyclic_active) {
++
++            spin_lock_irqsave(&idma_chan->vc.lock, vchan_flags);
++
++            if (idma_dev->current_channel == idma_chan) {
++                idma_chan->cyclic_stopping = true;
++                writel(IIS_IDMA_DESC_REG_CYCLIC_STOP,
++                    idma_dev->reg_base + IIS_IDMA_DESC_REG_CYCLIC_CTRL);
++            } else { /* channel queued but not executing */
++                struct iis_idma_channel *prev = idma_dev->current_channel;
++                /* remove idma_chan from the channel queue list */
++                while (prev && prev->next != idma_chan)
++                    prev = prev->next;
++                if (prev)
++                    prev->next = idma_chan->next;
++                idma_chan->next = NULL;
++                idma_chan->cyclic_stopping = false;
++            }
++
++            vd = vchan_next_desc(&idma_chan->vc);
++            if (vd) {
++                struct iis_idma_sw_desc *sw_desc;
++                sw_desc = to_idma_desc(vd);
++
++#ifdef DEBUG
++                irq_count = min_t(u32, sw_desc->dbg_irq_count,
++                                IIS_IDMA_DBG_IRQ_SAMPLES);
++                for (i = 0; i < irq_count; i++)
++                        irq_ts[i] = sw_desc->dbg_irq_ts[i];
++
++                dev_warn(idma_dev->dev,
++                        "cyclic callback termination: hw_periods=%u pending=%u next=%u/%u\n",
++                        sw_desc->dbg_hw_periods,
++                        sw_desc->dbg_vchan_pending,
++                        sw_desc->next_period,
++                        sw_desc->n_periods);
++#endif
++
++                list_del(&vd->node);
++                vchan_terminate_vdesc(vd); /* move to virt-dma's terminated */
++            }
++            spin_unlock_irqrestore(&idma_chan->vc.lock, vchan_flags);
++            spin_unlock_irqrestore(&idma_dev->current_channel_lock, iis_channel_flags);
++
++#ifdef DEBUG
++            if (irq_count > 1)
++                dev_warn(idma_dev->dev,
++                    "cyclic hard-IRQ deltas us: n=%u "
++                    "%llu %llu %llu %llu %llu %llu %llu\n",
++                    irq_count,
++                    irq_count > 1 ? div_u64(irq_ts[1] - irq_ts[0], 1000) : 0,
++                    irq_count > 2 ? div_u64(irq_ts[2] - irq_ts[1], 1000) : 0,
++                    irq_count > 3 ? div_u64(irq_ts[3] - irq_ts[2], 1000) : 0,
++                    irq_count > 4 ? div_u64(irq_ts[4] - irq_ts[3], 1000) : 0,
++                    irq_count > 5 ? div_u64(irq_ts[5] - irq_ts[4], 1000) : 0,
++                    irq_count > 6 ? div_u64(irq_ts[6] - irq_ts[5], 1000) : 0,
++                    irq_count > 7 ? div_u64(irq_ts[7] - irq_ts[6], 1000) : 0);
++#endif
++
++        }
++        else
+         {
+-                // make sure that the transfer stops here
+-                uncached_sw->hw_descs[uncached_hw_index]->next = cpu_to_le64(~0ULL);
++            struct iis_idma_channel *prev;
++
++            // dequeue everything we can, but leave needed descriptors in the
++            // queues for the irq handler.
++            idma_chan->is_terminated = true;
++
++            /* A channel linked behind another channel but not submitted to hw
++               is just waiting in the software list.  Unlink it to prevent
++               launch.  */
++            prev = idma_dev->current_channel;
++            while (prev && prev->next != idma_chan)
++                prev = prev->next;
++
++            /* We're terminating a channel that was never submitted => cleanup */
++            if (prev && !idma_chan->hw_submitted) {
++                prev->next = idma_chan->next;
++                idma_chan->next = NULL;
+ 
+                 spin_lock_irqsave(&idma_chan->vc.lock, vchan_flags);
+-                // move all sw descriptors after the uncached into our local list
+-                if (!list_is_last(&uncached_sw->vd.node, &idma_chan->vc.desc_issued))
++                vchan_get_all_descriptors(&idma_chan->vc, &discard_list);
++                spin_unlock_irqrestore(&idma_chan->vc.lock, vchan_flags);
++                spin_unlock_irqrestore(&idma_dev->current_channel_lock,
++                                        iis_channel_flags);
++
++                vchan_dma_desc_free_list(&idma_chan->vc, &discard_list);
++                wake_up(&idma_chan->wait_sync);
++                return 0;
++            }
++
++            if (is_channel_running(idma_chan, idma_dev) &&
++                try_get_first_non_prefetched(idma_chan, &non_prefetched_sw_desc, &non_prefetched_hw_index))
++            {
++                /* make sure that the transfer stops here */
++                non_prefetched_sw_desc->hw_descs[non_prefetched_hw_index]->next = cpu_to_le64(IIS_IDMA_DESC_LIST_LAST);
++
++                spin_lock_irqsave(&idma_chan->vc.lock, vchan_flags);
++                /* move all sw descriptors after the first non hw prefetched into our local list */
++                if (!list_is_last(&non_prefetched_sw_desc->vd.node, &idma_chan->vc.desc_issued))
+                 {
+-                        list_cut_before(&head, &uncached_sw->vd.node, uncached_sw->vd.node.next);
++                    /* Remove later sw descriptors */
++                    list_cut_position(&keep_list, &idma_chan->vc.desc_issued,
++                                    &non_prefetched_sw_desc->vd.node);
++                    list_splice_tail_init(&idma_chan->vc.desc_issued, &discard_list);
++                    list_splice_tail_init(&keep_list, &idma_chan->vc.desc_issued);
+                 }
+-        }
+-        else
+-        {
+-                // Either channel is not running, so we have no issued,
+-                // or all descriptors might be cached in hw, so don't touch them
++            }
++            else
++            {
++                /* Either channel is not running, so we have no issued,
++                or all descriptors might be cached in hw, so don't touch them */
+                 spin_lock_irqsave(&idma_chan->vc.lock, vchan_flags);
+-        }
++            }
+ 
+-        // get the rest
+-        list_splice_tail_init(&idma_chan->vc.desc_allocated, &head);
+-        list_splice_tail_init(&idma_chan->vc.desc_submitted, &head);
+-        list_splice_tail_init(&idma_chan->vc.desc_completed, &head);
+-        list_splice_tail_init(&idma_chan->vc.desc_terminated, &head);
++            // get the rest
++            list_splice_tail_init(&idma_chan->vc.desc_allocated, &discard_list);
++            list_splice_tail_init(&idma_chan->vc.desc_submitted, &discard_list);
++            list_splice_tail_init(&idma_chan->vc.desc_completed, &discard_list);
++            list_splice_tail_init(&idma_chan->vc.desc_terminated, &discard_list);
+ 
+-        spin_unlock_irqrestore(&idma_chan->vc.lock, vchan_flags);
+-        spin_unlock_irqrestore(&idma_dev->current_channel_lock, iis_channel_flags);
++            spin_unlock_irqrestore(&idma_chan->vc.lock, vchan_flags);
++            spin_unlock_irqrestore(&idma_dev->current_channel_lock, iis_channel_flags);
++
++            vchan_dma_desc_free_list(&idma_chan->vc, &discard_list);
++        }
+ 
+-        vchan_dma_desc_free_list(&idma_chan->vc, &head);
+         return 0;
+ }
+ 
+@@ -652,9 +1018,87 @@ static void iis_idma_synchronize(struct dma_chan *chan)
+         // else, wait for the next channel to start,
+         // with a wait queue or something
+         struct iis_idma_channel *idma_chan = to_idma_chan(chan);
++        struct iis_idma_device *idma_dev = idma_chan->parent;
++        int ret;
++        unsigned long flags;
++        unsigned long next_flags;
++        u32 cyclic_status;
++        struct virt_dma_desc *vd;
++        bool cyclic;
++
++        /* Cyclic: do STOP remaining work */
++        if (READ_ONCE(idma_chan->cyclic_stopping))
++        {
++
++            /* poll for STOP termination */
++            do {
++                ret = readl_poll_timeout(idma_dev->reg_base + IIS_IDMA_DESC_REG_CYCLIC_CTRL,
++                            cyclic_status,
++                            (cyclic_status & IIS_IDMA_DESC_REG_CYCLIC_STOPPED),
++                            IDMA_POLL_INTERVAL_USEC, IDMA_POLL_TIMEOUT);
++
++                if (ret < 0)
++                {
++                    dev_err(idma_dev->dev,
++                            "cyclic STOP timed out, status=%#x, ret: %d. DMA channel is STUCK !!\n",
++                            cyclic_status, ret);
++                    return;
++                }
++            } while (ret);
++
++            spin_lock_irqsave(&idma_dev->current_channel_lock, flags);
++            if (idma_dev->current_channel == idma_chan) {
++
++                struct iis_idma_channel *next_chan = idma_chan->next;
++                idma_chan->next = NULL;
++                idma_chan->hw_submitted = false;
++                idma_dev->current_channel = NULL;
++
++                /* remove stale non-submitted terminated channels (defensive) */
++                while (next_chan && next_chan->is_terminated && !next_chan->hw_submitted) {
++                        struct iis_idma_channel *cancelled_chan = next_chan;
++
++                        next_chan = cancelled_chan->next;
++                        cancelled_chan->next = NULL;
++                        wake_up(&cancelled_chan->wait_sync);
++                }
++
++                if (next_chan) {
++                    struct iis_idma_channel *queued_chan;
++
++                    spin_lock_irqsave(&next_chan->vc.lock, next_flags);
++                    iis_idma_maybe_launch_channel(next_chan, idma_dev);
++                    spin_unlock_irqrestore(&next_chan->vc.lock, next_flags);
++
++                    /* STOP flushed the hardware start-address FIFO. */
++                    for (queued_chan = next_chan->next; queued_chan; queued_chan = queued_chan->next) {
++
++                        spin_lock_irqsave(&queued_chan->vc.lock, next_flags);
++                        vd = vchan_next_desc(&queued_chan->vc);
++                        cyclic = vd && to_idma_desc(vd)->is_cyclic;
++                        if (vd && !cyclic) {
++                            queued_chan->hw_submitted = true;
++                            wmb();
++                            writeq(to_idma_desc(vd)->first, idma_dev->reg_base);
++                        }
++                        spin_unlock_irqrestore(&queued_chan->vc.lock, next_flags);
++                        if (!vd || cyclic)
++                            break;
++                    }
++                }
++            }
++            spin_unlock_irqrestore(&idma_chan->parent->current_channel_lock, flags);
++        }
++        else /* non-cyclic case */
++            wait_event(idma_chan->wait_sync, channel_wq_condition(idma_chan));
+ 
+-        wait_event(idma_chan->wait_sync, channel_wq_condition(idma_chan));
+         vchan_synchronize(&idma_chan->vc);
++        spin_lock_irqsave(&idma_dev->current_channel_lock, flags);
++        idma_chan->cyclic_stopping = false;
++        idma_chan->cyclic_active = false;
++        idma_chan->is_terminated = false;
++        spin_unlock_irqrestore(&idma_chan->parent->current_channel_lock, flags);
++
+ }
+ 
+ static u32 iis_idma_get_residue(struct iis_idma_channel *chan, dma_cookie_t cookie)
+@@ -673,16 +1117,25 @@ static u32 iis_idma_get_residue(struct iis_idma_channel *chan, dma_cookie_t cook
+         // DMA writes into memory, so flush caches before accessing hw descriptors
+         rmb();
+ 
+-        // traverse back to front, in order to be able to break once
+-        // the first complete transfer is found
+-        for (i = sw_desc->n_hw_descs - 1; i >= 0; --i)
++        if (!sw_desc->is_cyclic)
+         {
+-                if (le32_to_cpu(sw_desc->hw_descs[i]->flags) == (u32)~0)
++            // traverse back to front, in order to be able to break once
++            // the first complete transfer is found
++            for (i = sw_desc->n_hw_descs - 1; i >= 0; --i)
++            {
++                if (le32_to_cpu(sw_desc->hw_descs[i]->flags) == IIS_IDMA_DESC_COMPLETED)
+                 {
+-                        // this hw descriptor is complete, break
+-                        break;
++                    // this hw descriptor is complete, break
++                    break;
+                 }
+                 residue += le32_to_cpu(sw_desc->hw_descs[i]->length);
++            }
++        }
++        else
++        {
++            residue = sw_desc->buf_len - sw_desc->next_period * sw_desc->period_len;
++            if (!residue)
++                residue = sw_desc->buf_len;
+         }
+ out:
+         spin_unlock_irqrestore(&chan->vc.lock, flags);
+@@ -729,6 +1182,13 @@ static void iis_idma_issue_pending(struct dma_chan *chan)
+         }
+ 
+         iis_idma_maybe_launch_channel(idma_chan, idma_dev);
++
++        pr_info("idma issue: pending=%d current=%px running=%d cyclic_active=%d stopping=%d\n",
++                pending, idma_dev->current_channel,
++                is_channel_running(idma_chan, idma_dev),
++                idma_chan->cyclic_active,
++                idma_chan->cyclic_stopping);
++
+ out:
+         spin_unlock_irqrestore(&idma_chan->vc.lock, vchan_flags);
+         spin_unlock_irqrestore(&idma_dev->current_channel_lock, iis_channel_flags);
+@@ -764,6 +1224,7 @@ static int iis_idma_probe(struct platform_device *pdev)
+         if (ret < 0)
+                 return ret;
+ 
++        /* FIXME: implementation should not depend on this (PendingFifoDepth) */
+         ret = of_property_read_u32(of_node, "eth,pending-slots", &hw_cache_slots);
+         if (ret < 0)
+                 return ret;
+@@ -806,7 +1267,8 @@ static int iis_idma_probe(struct platform_device *pdev)
+         // get eth,pending-slots with e.g. of_property_read_u32_index
+         // setup capability struct
+         dma_cap_set(DMA_MEMCPY, idma_dev->dma_dev.cap_mask);
+-        dma_cap_set(DMA_SLAVE, idma_dev->dma_dev.cap_mask);
++        dma_cap_set(DMA_SLAVE, idma_dev->dma_dev.cap_mask);// Needed for audio
++        dma_cap_set(DMA_CYCLIC, idma_dev->dma_dev.cap_mask);
+         INIT_LIST_HEAD(&idma_dev->dma_dev.channels);
+         idma_dev->dma_dev.device_alloc_chan_resources = iis_idma_alloc_chan_resources;
+         idma_dev->dma_dev.device_free_chan_resources = iis_idma_free_chan_resources;
+@@ -819,6 +1281,10 @@ static int iis_idma_probe(struct platform_device *pdev)
+         idma_dev->dma_dev.residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
+         idma_dev->dma_dev.src_addr_widths = IIS_IDMA_SUPPORTED_ADDRESS_WIDTH;
+         idma_dev->dma_dev.dst_addr_widths = IIS_IDMA_SUPPORTED_ADDRESS_WIDTH;
++        idma_dev->dma_dev.directions = /*BIT(DMA_DEV_TO_MEM) | */BIT(DMA_MEM_TO_DEV) |
++                                        BIT(DMA_MEM_TO_MEM);
++        idma_dev->dma_dev.device_prep_dma_cyclic = iis_idma_prep_dma_cyclic;
++        idma_dev->dma_dev.device_config = iis_idma_slave_config;
+ 
+         // initialize any fields in the idma_dev, such as waiting lists
+ 
+@@ -828,6 +1294,9 @@ static int iis_idma_probe(struct platform_device *pdev)
+                 ret = iis_idma_chan_init(pdev, idma_dev, &idma_dev->channels[i]);
+                 if (ret)
+                         return ret;
++#ifdef DEBUG
++                dev_info(dev, "channel map: dma0chan%d=%px\n", i, &idma_dev->channels[i]);
++#endif
+         }
+         idma_dev->n_channels = number_of_channels;
+         // register driver
