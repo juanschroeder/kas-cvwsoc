@@ -18,11 +18,10 @@ SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protoc
            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} \
            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
           "
-SRCREV_BUILDROOT = "97f51310633ed671de5c4963845628e61a637a3d"
+SRCREV_BUILDROOT = "f0757224156be68f5af55cde4beed7661849c193"
 SRCREV = "1d3a00d3bacff25652c96e1527610c69e91f7c38"
 PV = "6.12.93+git"
 LINUX_VERSION = "6.12"
-SRCREV = "1d3a00d3bacff25652c96e1527610c69e91f7c38"
 
 # LINUX_VERSION needed for PV in linux-mainline-common
 # FIXME: 6.19 is crashing on boot (check)
@@ -34,9 +33,9 @@ SRC_URI[config.sha256sum] = "8eade6062d71cd60664f467fba6392501d3f5bcfa754c1f7d67
 
 SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
 DTS_SHA256:cvwsoc-nexysa7 = "8d004000e2cdda8d48b68d4d672e69d3dcf4df1457d734750ee2605d92a24f2a"
-DTS_SHA256:cvwsoc-genesys2 = "cb79c7543be1d94fce67032db998b3901abcd76cedb308e4c1786e37b9d89709"
+DTS_SHA256:cvwsoc-genesys2 = "c14842243dc96b391f9f804baa6a00f13a7e6f23c8e63000c5ebaf8861b45cab"
 DTS_SHA256:cvwsoc-genesys2xc7 = "e0afd354829d06bffb920d0d5f586749ed1235ecf38dfd82ba8cc7f577340ca0"
-DTS_SHA256:cvwsoc-genesys2rv32 = "0a1b3e52986eaac6c2b241f84bfd2450c31d2d1a56f60eb9711ad228158da1e5"
+DTS_SHA256:cvwsoc-genesys2rv32 = "d943cc21f9d19e2879c2784daa038802c7c98f6e074c91a78903b8b0910e4908"
 DTS_SHA256:cvwsoc-virt = "f430363c1e6f060653c090b8f07c3d5948501b2f3eb424f8e35edccea98f0456"
 DTS_SHA256:cvwsoc-virt32 = "b650c2278b42daf7768dfde6f0975af563fe00a2f85d8de5fa350ad27990c6f7"
 
@@ -82,8 +81,15 @@ SRC_URI:append = "  \
                     file://0011-idma-more-bugfixes.patch \
                     file://0012-idma-cvwsoc-customisations.patch \
                     file://0013-idma-engine-fix-wrongly-reworked-changes.patch \
+                    file://0014-idma-another-bugfix-and-cleanup.patch \
+                    file://0015-idma-cyclic-dma-support-and-fixes.patch \
+                    file://0016-asoc-i2s-driver.patch \
                     file://fragment-idma-engine-proxy.cfg \
+                    file://fragment-cvwsoc-i2s.cfg \
+                    file://fragment-pcm5102a.cfg \
+                    file://fragment-preempt.cfg \
                 "
+# FIXME: Add CONFIG_PREEMPT
 
 # dev
 SRC_URI:append = " file://fragment-dev-remove-dirty.cfg "

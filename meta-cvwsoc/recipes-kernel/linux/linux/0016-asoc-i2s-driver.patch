@@ -1,0 +1,256 @@
+I2S driver for hardwired I2S setup attached to AXI stream bus.
+It uses DMAEngine PCM framework.
+Audio settings are fixed and set to values that were found to work well with hw.
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
+index e87bd15a8b43..07473d78f952 100644
+--- a/sound/soc/Kconfig
++++ b/sound/soc/Kconfig
+@@ -122,6 +122,7 @@ source "sound/soc/uniphier/Kconfig"
+ source "sound/soc/ux500/Kconfig"
+ source "sound/soc/xilinx/Kconfig"
+ source "sound/soc/xtensa/Kconfig"
++source "sound/soc/cvwsoc/Kconfig"
+ 
+ # Supported codecs
+ source "sound/soc/codecs/Kconfig"
+diff --git a/sound/soc/Makefile b/sound/soc/Makefile
+index 775bb38c2ed4..8670320bfba2 100644
+--- a/sound/soc/Makefile
++++ b/sound/soc/Makefile
+@@ -76,3 +76,4 @@ obj-$(CONFIG_SND_SOC)	+= ux500/
+ obj-$(CONFIG_SND_SOC)	+= xilinx/
+ obj-$(CONFIG_SND_SOC)	+= xtensa/
+ obj-$(CONFIG_SND_SOC)	+= sdw_utils/
++obj-$(CONFIG_SND_SOC)   += cvwsoc/
+diff --git a/sound/soc/cvwsoc/Kconfig b/sound/soc/cvwsoc/Kconfig
+new file mode 100644
+index 000000000000..bf48010c83e1
+--- /dev/null
++++ b/sound/soc/cvwsoc/Kconfig
+@@ -0,0 +1,16 @@
++# SPDX-License-Identifier: GPL-2.0-only
++config SND_SOC_CVWSOC
++	tristate "ASoC support for CVWSOC (Core-V Wally)"
++	help
++	  Say Y or M if you want to add support for codecs attached to
++	  the CVWSOC SoCs' Audio interfaces. You will also need to
++	  select the audio interfaces to support below.
++
++config SND_SOC_CVWSOC_I2S
++	tristate "CVWSOC I2S Device Driver"
++	depends on HAVE_CLK && SND_SOC_CVWSOC
++	select SND_SOC_GENERIC_DMAENGINE_PCM
++	help
++	  Say Y or M if you want to add support for I2S driver for
++	  CVWSOC I2S device.
++
+diff --git a/sound/soc/cvwsoc/Makefile b/sound/soc/cvwsoc/Makefile
+new file mode 100644
+index 000000000000..88ec9ea51cae
+--- /dev/null
++++ b/sound/soc/cvwsoc/Makefile
+@@ -0,0 +1,6 @@
++# SPDX-License-Identifier: GPL-2.0
++# ROCKCHIP Platform Support
++snd-soc-cvwsoc-i2s-y := cvwsoc_i2s.o
++
++obj-$(CONFIG_SND_SOC_CVWSOC_I2S) += cvwsoc_i2s.o
++
+diff --git a/sound/soc/cvwsoc/cvwsoc_i2s.c b/sound/soc/cvwsoc/cvwsoc_i2s.c
+new file mode 100644
+index 000000000000..756b6fd8ebd4
+--- /dev/null
++++ b/sound/soc/cvwsoc/cvwsoc_i2s.c
+@@ -0,0 +1,187 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* sound/soc/cvwsoc/cvwsoc_i2s.c
++ *
++ * ALSA SoC Audio Layer - CVWSoC I2S Controller driver
++ *
++ * Copyright (c) 2026 Juan Carlos Schroeder
++ * Author: Juan Schroeder <jcschroeder@gmail.com>
++ */
++
++#include <linux/module.h>
++#include <linux/of.h>
++#include <sound/dmaengine_pcm.h>
++
++#define DRV_NAME "cvwsoc-i2s"
++
++/*
++ * The current AXI-stream DMA implementation requires a fixed cyclic
++ * layout. One stereo S24_LE frame occupies 8 bytes because ALSA stores
++ * each 24-bit sample in a 32-bit container.
++ */
++#define CVWSOC_PCM_FRAME_BYTES       8U
++/*
++    Hardware requirement:
++    AudioFifoDepth = 16K > CVWSOC_PCM_PERIOD_FRAMES * CVWSOC_PCM_FRAME_BYTES
++*/
++#define CVWSOC_PCM_PERIOD_FRAMES     1536U
++#define CVWSOC_PCM_PERIOD_BYTES      \
++        (CVWSOC_PCM_PERIOD_FRAMES * CVWSOC_PCM_FRAME_BYTES)
++#define CVWSOC_PCM_PERIODS           12U
++#define CVWSOC_PCM_BUFFER_BYTES      \
++        (CVWSOC_PCM_PERIOD_BYTES * CVWSOC_PCM_PERIODS)
++
++
++struct cvwsoc_i2s_dev {
++	struct device *dev;
++	bool has_capture;
++	bool has_playback;
++};
++
++/*
++ * For now, the hardware is fixed to stereo, 44.1 kHz, 24-bit samples in
++ * 32-bit containers. It has no software-configurable registers.
++ */
++static const struct snd_pcm_hardware cvwsoc_pcm_hardware = {
++	.info = SNDRV_PCM_INFO_MMAP |
++		SNDRV_PCM_INFO_MMAP_VALID |
++		SNDRV_PCM_INFO_INTERLEAVED,
++	.formats = SNDRV_PCM_FMTBIT_S24_LE,
++	.rates = SNDRV_PCM_RATE_44100,
++	.rate_min = 44100,
++	.rate_max = 44100,
++	.channels_min = 2,
++	.channels_max = 2,
++	.period_bytes_min = CVWSOC_PCM_PERIOD_BYTES,
++	.period_bytes_max = CVWSOC_PCM_PERIOD_BYTES,
++	.periods_min = CVWSOC_PCM_PERIODS,
++	.periods_max = CVWSOC_PCM_PERIODS,
++	.buffer_bytes_max = CVWSOC_PCM_BUFFER_BYTES,
++};
++
++static const struct snd_dmaengine_pcm_config cvwsoc_pcm_config = {
++	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
++	.pcm_hardware = &cvwsoc_pcm_hardware,
++	.prealloc_buffer_size = CVWSOC_PCM_BUFFER_BYTES,
++};
++
++/*
++ * The DMA channel writes directly to an AXI4-Stream endpoint, so there
++ * is no memory-mapped FIFO address. The CVWSoC DMA driver ignores
++ * dst_addr for this channel. Each AXI4-Stream beat is 32 bits.
++ */
++static struct snd_dmaengine_dai_dma_data cvwsoc_i2s_tx_dma = {
++	.addr       = 0,
++	.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES, /* confirm later */
++	.maxburst   = 1,
++};
++
++
++static struct snd_soc_dai_driver cvwsoc_i2s_dai = {
++	.name = "audio-dai",
++	.playback = {
++		.stream_name  = "Playback",
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates        = SNDRV_PCM_RATE_44100,
++		.rate_min = 44100,
++		.rate_max = 44100,
++		.formats      = SNDRV_PCM_FMTBIT_S24_LE,
++	},
++};
++
++static int cvwsoc_i2s_component_probe(struct snd_soc_component *component)
++{
++	struct snd_soc_dai *dai;
++
++	for_each_component_dais(component, dai) {
++		snd_soc_dai_init_dma_data(dai, &cvwsoc_i2s_tx_dma, NULL);
++		return 0;
++	}
++
++	return -ENODEV;
++}
++
++static const struct snd_soc_component_driver cvwsoc_i2s_component = {
++	.name = DRV_NAME,
++	.legacy_dai_naming = 1,
++	.probe = cvwsoc_i2s_component_probe,
++};
++
++static const struct of_device_id cvwsoc_i2s_match[] __maybe_unused = {
++	{ .compatible = "cvwsoc,i2s", },
++	{},
++};
++
++static int cvwsoc_i2s_init_dai(struct cvwsoc_i2s_dev *i2s,
++                            struct snd_soc_dai_driver **dp)
++{
++	struct device_node *node = i2s->dev->of_node;
++	struct property *dma_names;
++	const char *dma_name;
++
++	of_property_for_each_string(node, "dma-names", dma_names, dma_name) {
++		if (!strcmp(dma_name, "tx"))
++			i2s->has_playback = true;
++		if (!strcmp(dma_name, "rx"))
++			i2s->has_capture = true;
++	}
++
++	if (dp)
++		*dp = &cvwsoc_i2s_dai;
++
++	return 0;
++}
++
++static int cvwsoc_i2s_probe(struct platform_device *pdev)
++{
++	struct cvwsoc_i2s_dev *i2s;
++	struct snd_soc_dai_driver *dai;
++	int ret;
++
++	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
++	if (!i2s)
++		return -ENOMEM;
++
++	i2s->dev = &pdev->dev;
++
++    ret = cvwsoc_i2s_init_dai(i2s, &dai);
++	if (ret)
++		goto error;
++
++
++	ret = devm_snd_soc_register_component(&pdev->dev,
++					      &cvwsoc_i2s_component,
++					      dai, 1);
++
++	if (ret) {
++		dev_err(&pdev->dev, "Could not register DAI\n");
++		goto error;
++	}
++
++	ret = devm_snd_dmaengine_pcm_register(&pdev->dev,
++							&cvwsoc_pcm_config, 0);
++	if (ret) {
++		dev_err(&pdev->dev, "Could not register PCM: %d\n", ret);
++		goto error;
++	}
++
++	return 0;
++
++error:
++	return ret;
++}
++
++static struct platform_driver cvwsoc_i2s_driver = {
++	.probe = cvwsoc_i2s_probe,
++	.driver = {
++		.name = DRV_NAME,
++		.of_match_table = of_match_ptr(cvwsoc_i2s_match),
++	},
++};
++module_platform_driver(cvwsoc_i2s_driver);
++
++MODULE_DESCRIPTION("CVWSOC IIS ASoC Interface");
++MODULE_AUTHOR("Juan Schroeder <jcschroeder@gmail.com>");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:" DRV_NAME);
++MODULE_DEVICE_TABLE(of, cvwsoc_i2s_match);
