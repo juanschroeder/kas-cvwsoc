@@ -18,7 +18,7 @@ SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protoc
            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} \
            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
           "
-SRCREV_BUILDROOT = "f0757224156be68f5af55cde4beed7661849c193"
+SRCREV_BUILDROOT = "c8f8954b462d890f41bb57903fd6aa1c08eb1b59"
 SRCREV = "1d3a00d3bacff25652c96e1527610c69e91f7c38"
 PV = "6.12.93+git"
 LINUX_VERSION = "6.12"
@@ -32,7 +32,8 @@ SRC_URI[sha256sum] = "9108b4be5320017c147ef5b638f97f285c4fa3a6c0c6d14d1c00f25d12
 SRC_URI[config.sha256sum] = "8eade6062d71cd60664f467fba6392501d3f5bcfa754c1f7d6796cec12ac7a9e"
 
 SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
-DTS_SHA256:cvwsoc-nexysa7 = "8d004000e2cdda8d48b68d4d672e69d3dcf4df1457d734750ee2605d92a24f2a"
+DTS_SHA256:cvwsoc-nexysa7 = "593f57e0d92909c8e54159d90595f910b18c49d5c1319683517bb4749687410b"
+DTS_SHA256:cvwsoc-nexysa7rv32 = "435ce440aec9a43205d8e09a83a570575c52cac6900c767e1a763d8029a7da4c"
 DTS_SHA256:cvwsoc-genesys2 = "c14842243dc96b391f9f804baa6a00f13a7e6f23c8e63000c5ebaf8861b45cab"
 DTS_SHA256:cvwsoc-genesys2xc7 = "e0afd354829d06bffb920d0d5f586749ed1235ecf38dfd82ba8cc7f577340ca0"
 DTS_SHA256:cvwsoc-genesys2rv32 = "d943cc21f9d19e2879c2784daa038802c7c98f6e074c91a78903b8b0910e4908"
@@ -48,6 +49,8 @@ SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
 
 
 SRC_URI:append:cvwsoc-nexysa7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
+SRC_URI:append:cvwsoc-nexysa7rv32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
+SRC_URI:append:cvwsoc-nexysa7rv32 = " file://fragment-rv32.cfg "
 SRC_URI:append:cvwsoc-genesys2 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-genesys2xc7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2xc7-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-genesys2rv32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2rv32-dtb.patch', '', d)}"
@@ -57,13 +60,13 @@ SRC_URI:append:cvwsoc-virt32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', '
 SRC_URI:append:cvwsoc-virt32 = " file://fragment-rv32.cfg "
 # FIXME: this config probably needs to be stripped down
 SRC_URI:append:cvwsoc-virt = "  file://fragment-mtd-ram-jffs2.cfg \
-                                file://fragment-sdhci.cfg "
+                                file://fragment-sdhci.cfg \
+                                file://fragment-reenable-fs.cfg"
 SRC_URI:append:cvwsoc-virt32 = " file://fragment-mtd-ram-jffs2.cfg \
-                                 file://fragment-sdhci.cfg "
+                                 file://fragment-sdhci.cfg \
+                                 file://fragment-reenable-fs.cfg"
 
 # EXT2 seems to be slower than cpio. Enabled for SDHCI emulation
-SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
-                ' file://fragment-reenable-fs.cfg ', '', d)}"
 
 # FIXME: SDHCI driver still needs improvements
 SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a19704700adc0b0ed282.patch \
@@ -89,7 +92,6 @@ SRC_URI:append = "  \
                     file://fragment-pcm5102a.cfg \
                     file://fragment-preempt.cfg \
                 "
-# FIXME: Add CONFIG_PREEMPT
 
 # dev
 SRC_URI:append = " file://fragment-dev-remove-dirty.cfg "

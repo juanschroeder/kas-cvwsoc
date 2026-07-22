@@ -1,0 +1,11 @@
+header:
+  version: 12
+  includes:
+    - repos.yml
+target:
+  - cvwsoc-image-doom
+local_conf_header:
+  common: |
+    MACHINE = "cvwsoc-nexysa7rv32"
+    DISTRO = "distro-cvwsoc-basic"
+

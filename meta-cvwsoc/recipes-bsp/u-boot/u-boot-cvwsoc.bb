@@ -3,7 +3,7 @@ require recipes-bsp/u-boot/u-boot-common.inc
 
 DEPENDS += "u-boot-tools-native"
 
-SRCREV:cvwsoc = "2bc9ab504132f0ba7c8aed8acb6ca688b788c23b"
+SRCREV:cvwsoc = "d5530e673c72d283cbafc871fa5b0cad3329df1c"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}:${PN}:"
 SRC_URI:cvwsoc = "git://github.com/juanschroeder/u-boot.git;protocol=https;nobranch=1"
@@ -20,6 +20,10 @@ SRC_URI:append = "  file://fragment-sdhci.cfg \
 # Temporary patches for the WIP xc7 build
 SRC_URI:append:cvwsoc-genesys2xc7 = " file://0002-mmc-spi-timeout.patch"
 SRC_URI:append:cvwsoc-genesys2xc7 = " file://0003-xc7-change-default-dtb.patch"
+
+# Override generic u-boot board config
+SRC_URI:append:cvwsoc-nexysa7rv32 = " file://fragment-nexysa7rv32.cfg "
+SRC_URI:append:cvwsoc-nexysa7 = " file://fragment-nexysa7.cfg "
 
 LIC_FILES_CHKSUM:cvwsoc = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 
