@@ -65,9 +65,9 @@ SRC_URI:append:cvwsocvirt = " file://fragment-mtd-ram-jffs2.cfg \
 # FIXME: SDHCI driver still needs improvements
 SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a19704700adc0b0ed282.patch \
                    file://0004-sdhci-generic-driver-fixes-v6.12-all.patch \
-                   file://fragment-sdhci.cfg \
+                   file://fragment-sdhci.cfg "
 
-SRC_URI:append = "  file://0005-mtd-ram-erasesize-property-fix.patch "                "
+SRC_URI:append = "  file://0005-mtd-ram-erasesize-property-fix.patch "
 
 # iDMA and audio patches (NEEDS REWORK AND CLEANUP)
 SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
