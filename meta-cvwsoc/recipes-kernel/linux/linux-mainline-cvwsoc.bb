@@ -3,7 +3,6 @@ SUMMARY = "Mainline Linux Kernel for Core-V Wally SoCs"
 require recipes-kernel/linux/linux-mainline-common.inc
 
 DEPENDS:append = "${@bb.utils.contains('KERNEL_IMAGETYPES','Image.lzo',' lzop-native','',d)}"
-
 DEPENDS:append = "${@bb.utils.contains('KERNEL_IMAGETYPE_DISK','Image.lz4',' lz4-native','',d)}"
 
 FILESEXTRAPATHS =. "${THISDIR}/linux:"
@@ -31,6 +30,7 @@ LINUX_VERSION = "6.12"
 SRC_URI[sha256sum] = "9108b4be5320017c147ef5b638f97f285c4fa3a6c0c6d14d1c00f25d12070471"
 SRC_URI[config.sha256sum] = "8eade6062d71cd60664f467fba6392501d3f5bcfa754c1f7d6796cec12ac7a9e"
 
+# DTS SHA256
 SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
 DTS_SHA256:cvwsoc-nexysa7 = "593f57e0d92909c8e54159d90595f910b18c49d5c1319683517bb4749687410b"
 DTS_SHA256:cvwsoc-nexysa7rv32 = "435ce440aec9a43205d8e09a83a570575c52cac6900c767e1a763d8029a7da4c"
@@ -47,36 +47,34 @@ SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
                 file://fragment-tiny3.cfg ', '', d)}"
 
 
+# RV32 Kernel
+SRC_URI:append:cvwsoc32 = " file://fragment-rv32.cfg "
 
 SRC_URI:append:cvwsoc-nexysa7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-nexysa7rv32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
-SRC_URI:append:cvwsoc-nexysa7rv32 = " file://fragment-rv32.cfg "
 SRC_URI:append:cvwsoc-genesys2 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-genesys2xc7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2xc7-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-genesys2rv32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2rv32-dtb.patch', '', d)}"
-SRC_URI:append:cvwsoc-genesys2rv32 = " file://fragment-rv32.cfg "
 SRC_URI:append:cvwsoc-virt = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvw-wally-dtb.patch', '', d)}"
 SRC_URI:append:cvwsoc-virt32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-virt32-dtb.patch', '', d)}"
-SRC_URI:append:cvwsoc-virt32 = " file://fragment-rv32.cfg "
-# FIXME: this config probably needs to be stripped down
-SRC_URI:append:cvwsoc-virt = "  file://fragment-mtd-ram-jffs2.cfg \
-                                file://fragment-sdhci.cfg \
-                                file://fragment-reenable-fs.cfg"
-SRC_URI:append:cvwsoc-virt32 = " file://fragment-mtd-ram-jffs2.cfg \
-                                 file://fragment-sdhci.cfg \
-                                 file://fragment-reenable-fs.cfg"
 
-# EXT2 seems to be slower than cpio. Enabled for SDHCI emulation
+# FIXME: this config probably needs to be stripped down
+SRC_URI:append:cvwsocvirt = " file://fragment-mtd-ram-jffs2.cfg \
+                                 file://fragment-reenable-fs.cfg"
 
 # FIXME: SDHCI driver still needs improvements
 SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a19704700adc0b0ed282.patch \
                    file://0004-sdhci-generic-driver-fixes-v6.12-all.patch \
-                   file://0005-mtd-ram-erasesize-property-fix.patch \
-                   file://0006-usb-ohci-platform-use-local-memory.patch \
-                "
+                   file://fragment-sdhci.cfg \
 
-# iDMA patches (NEEDS REWORK AND CLEANUP)
-SRC_URI:append = "  \
+SRC_URI:append = "  file://0005-mtd-ram-erasesize-property-fix.patch "                "
+
+# iDMA and audio patches (NEEDS REWORK AND CLEANUP)
+SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
+                    'file://fragment-usb-snd.cfg \
+                    file://fragment-kbd.cfg \
+                    file://fragment-fb-console.cfg \
+                    file://0006-usb-ohci-platform-use-local-memory.patch \
                     file://0007-idma-base-cheshire-6.12-pr-driver.patch \
                     file://0008-idma-first-rv32-bugfixes.patch \
                     file://0009-idma-bugfix-mising-spinlock-init.patch \
@@ -87,20 +85,24 @@ SRC_URI:append = "  \
                     file://0014-idma-another-bugfix-and-cleanup.patch \
                     file://0015-idma-cyclic-dma-support-and-fixes.patch \
                     file://0016-asoc-i2s-driver.patch \
+                    file://0017-bugfix-physmap-rounding-power2-down.patch \
                     file://fragment-idma-engine-proxy.cfg \
                     file://fragment-cvwsoc-i2s.cfg \
                     file://fragment-pcm5102a.cfg \
                     file://fragment-preempt.cfg \
-                "
+                ', '', d)}"
 
 # dev
 SRC_URI:append = " file://fragment-dev-remove-dirty.cfg "
 
-
+# For QEMU virtio (framebuffer, audio)
 SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
-                'file://fragment-usb-snd.cfg \
-                 file://fragment-kbd.cfg \
-                 file://fragment-fb-console.cfg', '', d)}"
+                    'file://fragment-drm-virtio-fbdev.cfg \
+                    file://fragment-virtio-pci.cfg \
+                    file://fragment-virtio-input.cfg \
+                    file://fragment-virtio-snd.cfg \
+                ', '', d)}"
+
 
 COMPATIBLE_MACHINE = "(cvwsoc)"
 

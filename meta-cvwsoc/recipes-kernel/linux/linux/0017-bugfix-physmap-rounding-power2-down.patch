@@ -1,0 +1,25 @@
+Fix physmap mappings with non-power-of-two resource sizes.
+When address GPIO windowing is not used, preserve the exact memory-resource
+size instead of rounding it down to the next lower power of two.
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/drivers/mtd/maps/physmap-core.c b/drivers/mtd/maps/physmap-core.c
+index 96eb2e782c38..269a792f0f11 100644
+--- a/drivers/mtd/maps/physmap-core.c
++++ b/drivers/mtd/maps/physmap-core.c
+@@ -519,9 +519,9 @@ static int physmap_flash_probe(struct platform_device *dev)
+ 			info->maps[i].phys = res->start;
+ 
+ 		info->win_order = fls64(resource_size(res)) - 1;
+-		info->maps[i].size = BIT(info->win_order +
+-					 (info->gpios ?
+-					  info->gpios->ndescs : 0));
++		info->maps[i].size = info->gpios ?
++				BIT(info->win_order + info->gpios->ndescs) :
++				resource_size(res);
+ 
+ 		info->maps[i].map_priv_1 = (unsigned long)dev;
+ 

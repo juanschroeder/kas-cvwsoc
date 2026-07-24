@@ -1,0 +1,13 @@
+header:
+  version: 12
+  includes:
+    - repos.yml
+target:
+  - cvwsoc-image-doom
+local_conf_header:
+  common: |
+    MACHINE = "cvwsoc-virt32"
+    DISTRO = "distro-cvwsoc-basic"
+    # Uncompressed Kernel in the Image is faster for simulation
+    KERNEL_IMAGETYPE = "Image"
+

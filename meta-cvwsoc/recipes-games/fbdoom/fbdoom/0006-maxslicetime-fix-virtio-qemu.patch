@@ -1,0 +1,117 @@
+diff --git a/meta-cvwsoc/conf/distro/distro-cvwsoc-basic.conf b/meta-cvwsoc/conf/distro/distro-cvwsoc-basic.conf
+index f5e4bd7..dff5d30 100644
+--- a/meta-cvwsoc/conf/distro/distro-cvwsoc-basic.conf
++++ b/meta-cvwsoc/conf/distro/distro-cvwsoc-basic.conf
+@@ -7,4 +7,19 @@ DISTRO = "distro-cvwsoc-basic"
+ DISTRO_NAME = "CVWSoC basic distro"
+ 
+ DISTRO_FEATURES:remove = "bluetooth debuginfod pcmcia wifi pci 3g nfc x11 seccomp opengl ptest wayland vulkan pulseaudio "
+-DISTRO_FEATURES:append = " fbcon"
++DISTRO_FEATURES:append = " fbcon "
++
++# These settings below are for the 
++IMAGE_FSTYPES:append = " jffs2"
++# The computed size must be aligned to the JFFS2 erase block: 8 KiB.
++IMAGE_ROOTFS_ALIGNMENT = "8"
++
++JFFS2_ENDIANNESS = "-l"
++JFFS2_ERASEBLOCK = "0x2000"
++JFFS2_FREE_SPACE_MIB = "32"
++
++EXTRA_IMAGECMD:jffs2 = "--pad -l --eraseblock=0x2000 --no-cleanmarkers -x zlib -x rtime"
++
++IMAGE_CMD:jffs2:append = "; \
++    dd if=/dev/zero bs=1M count=${JFFS2_FREE_SPACE_MIB} status=none | \
++    tr '\000' '\377' >> ${IMGDEPLOYDIR}/${IMAGE_NAME}.jffs2"
+diff --git a/meta-cvwsoc/conf/distro/distro-cvwsoc-tiny.conf b/meta-cvwsoc/conf/distro/distro-cvwsoc-tiny.conf
+index e0aa89d..476f15c 100644
+--- a/meta-cvwsoc/conf/distro/distro-cvwsoc-tiny.conf
++++ b/meta-cvwsoc/conf/distro/distro-cvwsoc-tiny.conf
+@@ -11,5 +11,6 @@ DISTRO_FEATURES:append = " tiny"
+ KERNEL_IMAGETYPE = "Image"
+ IMAGE_FSTYPES:append = " cpio ext2 jffs2"
+ EXTRA_IMAGECMD:jffs2 = "--pad=0x400000 -l --eraseblock=0x2000 --no-cleanmarkers -x zlib -x rtime"
++
+ # 4MB should be enough for now
+ IMAGE_ROOTFS_SIZE = "4096"
+diff --git a/meta-cvwsoc/recipes-games/fbdoom/fbdoom_0.1.bb b/meta-cvwsoc/recipes-games/fbdoom/fbdoom_0.1.bb
+index 9564b10..07e4f43 100644
+--- a/meta-cvwsoc/recipes-games/fbdoom/fbdoom_0.1.bb
++++ b/meta-cvwsoc/recipes-games/fbdoom/fbdoom_0.1.bb
+@@ -21,7 +21,14 @@ SRC_URI:append = "  file://0002-enable-sound.patch \
+                  "
+ 
+ # This patch is not useful unless used with a 22 KHz capable sound card (and it introduces rate conversion)
+-#                    file://0003-samplerate_22KHz.patch 
++#                    file://0003-samplerate_22KHz.patch
++
++
++# Enable only for virtual targets (QEMU)
++SRC_URI:append:virt =     " 0006-maxslicetime-fix-virtio-qemu.patch "
++SRC_URI:append:virt32 =   "  0006-maxslicetime-fix-virtio-qemu.patch "
++
++
+ 
+ SRCREV = "6c599f50e9e8e9436a5c064f42836eb48ff6bde0"
+ SRC_URI[sha256sum] = "bdfe857256245da04fd38a19f4d3bff1b6d9971def7c06e246340a69057586ba"
+diff --git a/meta-cvwsoc/recipes-kernel/linux/linux-mainline-cvwsoc.bb b/meta-cvwsoc/recipes-kernel/linux/linux-mainline-cvwsoc.bb
+index f18332f..cb1f5c7 100644
+--- a/meta-cvwsoc/recipes-kernel/linux/linux-mainline-cvwsoc.bb
++++ b/meta-cvwsoc/recipes-kernel/linux/linux-mainline-cvwsoc.bb
+@@ -58,6 +58,7 @@ SRC_URI:append:cvwsoc-genesys2rv32 = " file://fragment-rv32.cfg "
+ SRC_URI:append:cvwsoc-virt = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvw-wally-dtb.patch', '', d)}"
+ SRC_URI:append:cvwsoc-virt32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-virt32-dtb.patch', '', d)}"
+ SRC_URI:append:cvwsoc-virt32 = " file://fragment-rv32.cfg "
++
+ # FIXME: this config probably needs to be stripped down
+ SRC_URI:append:cvwsoc-virt = "  file://fragment-mtd-ram-jffs2.cfg \
+                                 file://fragment-sdhci.cfg \
+@@ -76,7 +77,11 @@ SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a1970470
+                 "
+ 
+ # iDMA patches (NEEDS REWORK AND CLEANUP)
+-SRC_URI:append = "  \
++
++SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
++                    'file://fragment-usb-snd.cfg \
++                    file://fragment-kbd.cfg \
++                    file://fragment-fb-console.cfg
+                     file://0007-idma-base-cheshire-6.12-pr-driver.patch \
+                     file://0008-idma-first-rv32-bugfixes.patch \
+                     file://0009-idma-bugfix-mising-spinlock-init.patch \
+@@ -87,15 +92,23 @@ SRC_URI:append = "  \
+                     file://0014-idma-another-bugfix-and-cleanup.patch \
+                     file://0015-idma-cyclic-dma-support-and-fixes.patch \
+                     file://0016-asoc-i2s-driver.patch \
++                    file://0017-bugfix-physmap-rounding-power2-down.patch \
+                     file://fragment-idma-engine-proxy.cfg \
+                     file://fragment-cvwsoc-i2s.cfg \
+                     file://fragment-pcm5102a.cfg \
+                     file://fragment-preempt.cfg \
+-                "
++                ', '', d)}"
+ 
+ # dev
+ SRC_URI:append = " file://fragment-dev-remove-dirty.cfg "
+ 
++SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
++                    'file://fragment-drm-virtio-fbdev.cfg \
++                    file://fragment-virtio-pci.cfg \
++                    file://fragment-virtio-input.cfg \
++                    file://fragment-virtio-snd.cfg \
++                ', '', d)}"
++
+ 
+ SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
+                 'file://fragment-usb-snd.cfg \
+diff --git a/meta-cvwsoc/recipes-kernel/linux/linux/fragment-usb-snd.cfg b/meta-cvwsoc/recipes-kernel/linux/linux/fragment-usb-snd.cfg
+index aee6314..bd2aef7 100644
+--- a/meta-cvwsoc/recipes-kernel/linux/linux/fragment-usb-snd.cfg
++++ b/meta-cvwsoc/recipes-kernel/linux/linux/fragment-usb-snd.cfg
+@@ -170,6 +170,5 @@ CONFIG_SND_SIMPLE_CARD=y
+ # CONFIG_SND_AUDIO_GRAPH_CARD is not set
+ # CONFIG_SND_AUDIO_GRAPH_CARD2 is not set
+ # CONFIG_SND_TEST_COMPONENT is not set
+-# CONFIG_SND_VIRTIO is not set
+ # CONFIG_HID_PRODIKEYS is not set
+ CONFIG_XARRAY_MULTI=y
