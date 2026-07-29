@@ -2,7 +2,6 @@ SUMMARY = "Minimal initramfs for CVW SoC"
 LICENSE = "MIT"
 
 inherit core-image
-#INHERIT += "extrausers"
 inherit extrausers
 
 
@@ -16,41 +15,21 @@ IMAGE_FSTYPES = "${INITRAMFS_FSTYPES}"
 WKS_FILE = ""
 EXTRA_IMAGEDEPENDS = ""
 
-#IMAGE_ROOTFS_SIZE = "8192"
-#IMAGE_ROOTFS_EXTRA_SPACE = "0"
 IMAGE_ROOTFS_SIZE = "65536"
 IMAGE_ROOTFS_EXTRA_SPACE = "4096"
 
 # prevent the .rootfs suffix
 IMAGE_NAME_SUFFIX = ""
 
-
-# # root/blank user
-# EXTRA_IMAGE_FEATURES += "allow-empty-password allow-root-login empty-root-password"
-# # cvw user
-# #INHERIT += "extrausers"
-# EXTRA_USERS_PARAMS = "useradd cvw; \
-#                         usermod -p '' cvw; \
-#                         groupadd sudo; \    
-#                         usermod -a -G sudo,video,input cvw;\
-#                         "
-
-#############
-#IMAGE_FEATURES += "debug-tweaks serial-autologin-root"
 IMAGE_FEATURES += "empty-root-password serial-autologin-root"
-inherit extrausers
 EXTRA_USERS_PARAMS = "\
     usermod -p '' root; \
     useradd -p '' -s /bin/sh cvw; \
     groupadd -f sudo; \
     usermod -a -G sudo,video,input cvw; \
 "
-#############
-
 
 IMAGE_INSTALL:append = " kernel-modules"
-
-
 IMAGE_INSTALL += " \
     devmem2 \
     memtester \
@@ -59,22 +38,12 @@ IMAGE_INSTALL += " \
     htop \
     "
 
-# strace does not support RV32
-IMAGE_INSTALL:append:cvwsoc64 = " strace "
-
-# # Doom and graphics related
-# IMAGE_INSTALL += " \
-#     fbset \
-#     "
-
 # audio / usb audio support
 IMAGE_INSTALL:append = " alsa-lib \
                         alsa-utils-aplay \
                         alsa-utils-amixer \
                         alsa-utils-speakertest \
                         alsa-utils-alsactl "
-
-
 
 
 disable_udev_startup() {

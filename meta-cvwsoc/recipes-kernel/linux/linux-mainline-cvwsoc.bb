@@ -119,7 +119,7 @@ do_kernel_metadata:prepend() {
     printf '\n' >> ${S}/arch/riscv/configs/linux.soc.config
 }
 
-# No DTS build in Renode target
+# No DTS build for Renode target
 do_kernel_metadata:prepend:cvwsoc() {
     install -m 644 ${UNPACKDIR}/${CVWSOC_DTS}.${SRCREV_BUILDROOT} ${S}/arch/riscv/boot/dts/${CVWSOC_DTS}
 }
