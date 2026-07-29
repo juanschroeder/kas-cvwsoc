@@ -62,6 +62,9 @@ SRC_URI:append:cvwsoc-virt32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', '
 SRC_URI:append:cvwsocvirt = " file://fragment-mtd-ram-jffs2.cfg \
                                  file://fragment-reenable-fs.cfg"
 
+SRC_URI:append:cvwsocvirt = " file://fragment-disable-dbg-stuff.cfg "
+SRC_URI:append:cvwsoc-renode-u540 = " file://fragment-disable-dbg-stuff.cfg "
+
 # FIXME: SDHCI driver still needs improvements
 SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a19704700adc0b0ed282.patch \
                    file://0004-sdhci-generic-driver-fixes-v6.12-all.patch \
@@ -129,6 +132,10 @@ do_deploy:append() {
         ${STAGING_BINDIR_NATIVE}/lz4 -12 --content-size "${src}" "${out}.tmp"
         mv -f "${out}.tmp" "${out}"
     fi
+
+    # Deploy vmlinux
+    cp ${B}/vmlinux ${DEPLOYDIR}
+
 }
 
 # This is broken in current Yocto: https://lists.openembedded.org/g/openembedded-core/message/226911
