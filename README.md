@@ -10,9 +10,11 @@ Platforms:
 - Genesys 2
 - Nexys A7
 - Virtual (Verilator) platform
+- Renode (FU540 Co-simulation with CVWSoC)
 
 Soft CPUs:
 - Core-V Wally 32/64 bits
+- SiFive FU540 (Renode)
 
 Remark: Currently 32 bits is only supported in Verilator and Genesys 2 (FPGA) platforms.
 
@@ -27,8 +29,10 @@ The builds below are images for specific targets.
 - 'cvwsoc-genesys2xc7-bringup':   Minimal image for Genesys 2 and OpenXC7 FPGA bitstream.
 - 'cvwsoc-nexysa7-bringup':       Minimal image for Nexys A7.
 - 'cvwsoc-nexysa7-doom':          Image for Nexys A7 that includes stuff for running FB Doom and other extra stuff.
+- 'cvwsoc-nexysa7rv32-doom'
 - 'cvwsoc-virt-tiny':             Image/binaries for sim/verilator/Makefile.cvwsoc targets for verilation in [1]. Fastest/minimal boot.
 - 'cvwsoc-virt-full':             Idem, but with more stuff.
+- 'cvwsoc-renode-u540':           Renode binaries for FU540 co-simulation
 
 E.g. 
 ```
