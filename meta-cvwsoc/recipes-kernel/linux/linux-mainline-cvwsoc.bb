@@ -13,8 +13,10 @@ DEPENDS += "u-boot-tools-native"
 BRANCH = "linux-6.12.y"
 KBUILD_DEFCONFIG ?= "linux.soc.config"
 
-SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protocol=https;branch=${BRANCH} \
-           https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} \
+SRC_URI = " git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protocol=https;branch=${BRANCH} \
+            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} \
+            "
+SRC_URI:cvwsoc = "\
            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
           "
 SRCREV_BUILDROOT = "c8f8954b462d890f41bb57903fd6aa1c08eb1b59"
@@ -62,6 +64,9 @@ SRC_URI:append:cvwsoc-virt32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', '
 SRC_URI:append:cvwsocvirt = " file://fragment-mtd-ram-jffs2.cfg \
                                  file://fragment-reenable-fs.cfg"
 
+SRC_URI:append:cvwsocvirt = " file://fragment-disable-dbg-stuff.cfg "
+SRC_URI:append:cvwsoc-renode-u540 = " file://fragment-disable-dbg-stuff.cfg "
+
 # FIXME: SDHCI driver still needs improvements
 SRC_URI:append = " file://0003-sdhci-generic-driver-802935a6a27e48050339a19704700adc0b0ed282.patch \
                    file://0004-sdhci-generic-driver-fixes-v6.12-all.patch \
@@ -103,6 +108,7 @@ SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
                     file://fragment-virtio-snd.cfg \
                 ', '', d)}"
 
+SRC_URI:append:cvwsoc-renode-u540 = " file://fragment-sifive.cfg "
 
 COMPATIBLE_MACHINE = "(cvwsoc)"
 
@@ -111,6 +117,10 @@ do_kernel_metadata:prepend() {
     # We need to copy the defconfig to the source directory for the kernel build to find it
     install -m 644 ${UNPACKDIR}/${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} ${S}/arch/riscv/configs/linux.soc.config
     printf '\n' >> ${S}/arch/riscv/configs/linux.soc.config
+}
+
+# No DTS build in Renode target
+do_kernel_metadata:prepend:cvwsoc() {
     install -m 644 ${UNPACKDIR}/${CVWSOC_DTS}.${SRCREV_BUILDROOT} ${S}/arch/riscv/boot/dts/${CVWSOC_DTS}
 }
 
@@ -129,6 +139,10 @@ do_deploy:append() {
         ${STAGING_BINDIR_NATIVE}/lz4 -12 --content-size "${src}" "${out}.tmp"
         mv -f "${out}.tmp" "${out}"
     fi
+
+    # Deploy vmlinux
+    cp ${B}/vmlinux ${DEPLOYDIR}
+
 }
 
 # This is broken in current Yocto: https://lists.openembedded.org/g/openembedded-core/message/226911

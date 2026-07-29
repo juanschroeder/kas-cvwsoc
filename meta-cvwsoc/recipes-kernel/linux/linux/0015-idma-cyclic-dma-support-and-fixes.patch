@@ -404,7 +404,7 @@ index 7448f6eafb57..aba613113daf 100644
 +            case DMA_MEM_TO_DEV:
 +                direction_flags = IIS_IDMA_DESC_PROTOCOL_AXI << IIS_IDMA_DESC_FLAGS_PROTOCOL_SRC_BIT |
 +                                  IIS_IDMA_DESC_PROTOCOL_AXISTREAM << IIS_IDMA_DESC_FLAGS_PROTOCOL_DST_BIT;
-+                memory_flags = IIS_IDMA_AXI_INCR << 1;
++                memory_flags = IIS_IDMA_AXI_INCR << 1 | IIS_IDMA_AXI_INCR << 3;
 +
 +                return
 +                    direction_flags |
