@@ -13,8 +13,10 @@ DEPENDS += "u-boot-tools-native"
 BRANCH = "linux-6.12.y"
 KBUILD_DEFCONFIG ?= "linux.soc.config"
 
-SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protocol=https;branch=${BRANCH} \
-           https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} \
+SRC_URI = " git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protocol=https;branch=${BRANCH} \
+            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} \
+            "
+SRC_URI:cvwsoc = "\
            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
           "
 SRCREV_BUILDROOT = "c8f8954b462d890f41bb57903fd6aa1c08eb1b59"
@@ -106,6 +108,7 @@ SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
                     file://fragment-virtio-snd.cfg \
                 ', '', d)}"
 
+SRC_URI:append:cvwsoc-renode-u540 = " file://fragment-sifive.cfg "
 
 COMPATIBLE_MACHINE = "(cvwsoc)"
 
@@ -114,6 +117,10 @@ do_kernel_metadata:prepend() {
     # We need to copy the defconfig to the source directory for the kernel build to find it
     install -m 644 ${UNPACKDIR}/${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} ${S}/arch/riscv/configs/linux.soc.config
     printf '\n' >> ${S}/arch/riscv/configs/linux.soc.config
+}
+
+# No DTS build in Renode target
+do_kernel_metadata:prepend:cvwsoc() {
     install -m 644 ${UNPACKDIR}/${CVWSOC_DTS}.${SRCREV_BUILDROOT} ${S}/arch/riscv/boot/dts/${CVWSOC_DTS}
 }
 
