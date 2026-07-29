@@ -23,7 +23,7 @@ SRC_URI:append = "  file://0002-enable-sound.patch \
 #                    file://0003-samplerate_22KHz.patch
 
 # Only for virtual targets (QEMU)
-SRC_URI:append:cvwsocvirt =     " 0006-maxslicetime-fix-virtio-qemu.patch "
+SRC_URI:append:cvwsocvirt =  " file://0006-maxslicetime-fix-virtio-qemu.patch "
 
 SRCREV = "6c599f50e9e8e9436a5c064f42836eb48ff6bde0"
 SRC_URI[sha256sum] = "bdfe857256245da04fd38a19f4d3bff1b6d9971def7c06e246340a69057586ba"
