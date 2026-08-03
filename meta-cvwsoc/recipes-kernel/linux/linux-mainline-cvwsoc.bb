@@ -19,7 +19,7 @@ SRC_URI = " git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;proto
 SRC_URI:append:cvwsoc = "\
            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
           "
-SRCREV_BUILDROOT = "c8f8954b462d890f41bb57903fd6aa1c08eb1b59"
+SRCREV_BUILDROOT = "ec9be11cda602d62059ce8610d9000c795a71b32"
 SRCREV = "1d3a00d3bacff25652c96e1527610c69e91f7c38"
 PV = "6.12.93+git"
 LINUX_VERSION = "6.12"
@@ -36,10 +36,10 @@ SRC_URI[config.sha256sum] = "8eade6062d71cd60664f467fba6392501d3f5bcfa754c1f7d67
 SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
 DTS_SHA256:cvwsoc-nexysa7 = "593f57e0d92909c8e54159d90595f910b18c49d5c1319683517bb4749687410b"
 DTS_SHA256:cvwsoc-nexysa7rv32 = "435ce440aec9a43205d8e09a83a570575c52cac6900c767e1a763d8029a7da4c"
-DTS_SHA256:cvwsoc-genesys2 = "c14842243dc96b391f9f804baa6a00f13a7e6f23c8e63000c5ebaf8861b45cab"
+DTS_SHA256:cvwsoc-genesys2 = "30c0bd5dfbc4c0a6b1c584dd28a123ad6fd4ed44bcd5f62aae1267aacdfda603"
 DTS_SHA256:cvwsoc-genesys2xc7 = "e0afd354829d06bffb920d0d5f586749ed1235ecf38dfd82ba8cc7f577340ca0"
-DTS_SHA256:cvwsoc-genesys2rv32 = "d943cc21f9d19e2879c2784daa038802c7c98f6e074c91a78903b8b0910e4908"
-DTS_SHA256:cvwsoc-virt = "f430363c1e6f060653c090b8f07c3d5948501b2f3eb424f8e35edccea98f0456"
+DTS_SHA256:cvwsoc-genesys2rv32 = "405d9496deea0754f78931d96196950a93e41e417e724dd53a399f304b99c171"
+DTS_SHA256:cvwsoc-virt = "12fa476ef7a1855b0f06f4d2df31845ac9e0dd4d3aa334745a1b40de00480eaa"
 DTS_SHA256:cvwsoc-virt32 = "b650c2278b42daf7768dfde6f0975af563fe00a2f85d8de5fa350ad27990c6f7"
 
 # tiny Kernel
