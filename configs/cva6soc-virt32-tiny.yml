@@ -3,9 +3,9 @@ header:
   includes:
     - repos.yml
 target:
-  - opensbi
+  - cvwsoc-image-tiny
 local_conf_header:
   common: |
-    MACHINE = "cvwsoc-renode-u540"
-    DISTRO = "distro-cvwsoc-basic"
+    MACHINE = "cva6soc-virt32"
+    DISTRO = "distro-cvwsoc-tiny"
 

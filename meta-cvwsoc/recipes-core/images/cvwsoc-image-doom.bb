@@ -41,6 +41,17 @@ IMAGE_INSTALL:append = " alsa-lib \
 ROOTFS_POSTPROCESS_COMMAND += "create_asound_conf; "
 create_asound_conf() {
     mkdir -p ${IMAGE_ROOTFS}/etc
-    echo -e '# defaut card config\npcm.!default {\n    type plug\n    slave.pcm "hw:0,0"\n}\n\nctl.!default {\n    type hwbin\n    card 0\n}' > ${IMAGE_ROOTFS}/etc/asound.conf
+
+    printf '%s\n' \
+        '# default card config' \
+        'pcm.!default {' \
+        '    type plug' \
+        '    slave.pcm "hw:0,0"' \
+        '}' \
+        '' \
+        'ctl.!default {' \
+        '    type hwbin' \
+        '    card 0' \
+        '}' > ${IMAGE_ROOTFS}/etc/asound.conf
 }
 

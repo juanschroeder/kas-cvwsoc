@@ -1,0 +1,24 @@
+// Fixed PMOD setup shared by all boards; assume the modules are connected.
+/ {
+  pcm5102a: codec {
+    compatible = "ti,pcm5102a";
+    #sound-dai-cells = <0>;
+  };
+
+  sound {
+    compatible = "simple-audio-card";
+    simple-audio-card,name = "CVWSoC PCM5102A";
+    simple-audio-card,format = "i2s";
+
+    simple-audio-card,bitclock-master = <&sound_cpu>;
+    simple-audio-card,frame-master = <&sound_cpu>;
+
+    sound_cpu: simple-audio-card,cpu {
+      sound-dai = <&i2s_tx>;
+    };
+
+    simple-audio-card,codec {
+      sound-dai = <&pcm5102a>;
+    };
+  };
+};

@@ -1,0 +1,27 @@
+
+/ {
+
+  cpus {
+    #address-cells = <0x01>;
+    #size-cells = <0x00>;
+
+    cpu@0 {
+      device_type = "cpu";
+      reg = <0x00>;
+      status = "okay";
+      compatible = "riscv";
+      riscv,isa-base = "rv64i";
+      riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "zba", "zbb", "zbc", "zbs", "zca", "zcb", "zcd", "zicntr", "zicond", "zicsr", "zifencei", "zicbom", "zihpm";
+      riscv,cbom-block-size = <0x40>;
+      mmu-type = "riscv,sv39";
+
+      cpu_intc: interrupt-controller {
+        #address-cells = <0>;
+        #interrupt-cells = <0x01>;
+        interrupt-controller;
+        compatible = "riscv,cpu-intc";
+      };
+    };
+  };
+
+};
