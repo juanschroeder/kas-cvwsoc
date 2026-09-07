@@ -1,0 +1,22 @@
+/dts-v1/;
+
+ /include/ "cvwsoc-cpu-cva6.dtsi"
+ /include/ "cvwsoc.dtsi"
+ /include/ "cvwsoc-board-genesys2.dtsi"
+
+/ {
+  model = "CVWSoC CVA6 RV64 on Digilent Genesys 2";
+  compatible = "cvwsoc,cva6-genesys2", "cvwsoc,cvwsoc";
+
+  cpus {
+    timebase-frequency = <60000000>;
+    cpu@0 {
+      clock-frequency = <60000000>;
+    };
+  };
+
+
+};
+
+&refclk { clock-frequency = <60000000>; };
+&busclk { clock-frequency = <100000000>; };

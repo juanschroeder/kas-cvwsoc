@@ -3,9 +3,9 @@ header:
   includes:
     - repos.yml
 target:
-  - opensbi
+  - cvwsoc-image-doom
 local_conf_header:
   common: |
-    MACHINE = "cvwsoc-renode-u540"
+    MACHINE = "cva6soc-genesys2"
     DISTRO = "distro-cvwsoc-basic"
 

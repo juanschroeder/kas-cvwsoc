@@ -5,21 +5,22 @@ require recipes-kernel/linux/linux-mainline-common.inc
 DEPENDS:append = "${@bb.utils.contains('KERNEL_IMAGETYPES','Image.lzo',' lzop-native','',d)}"
 DEPENDS:append = "${@bb.utils.contains('KERNEL_IMAGETYPE_DISK','Image.lz4',' lz4-native','',d)}"
 
+DEPENDS:append = " dtc-native"
+
 FILESEXTRAPATHS =. "${THISDIR}/linux:"
 
 # FIXME: put in machine conf?
 CVWSOC_DTS = "${CVWSOC_DTS_FILENAME}.dts"
-DEPENDS += "u-boot-tools-native"
+DEPENDS:append:cvwsoc = " u-boot-tools-native"
+# Get DTS files to use
+DEPENDS:append:cvwsoc = " cvwsoc-dts"
 BRANCH = "linux-6.12.y"
 KBUILD_DEFCONFIG ?= "linux.soc.config"
 
+
 SRC_URI = " git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;protocol=https;branch=${BRANCH} \
-            https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/br2-external-tree/board/wally/${KBUILD_DEFCONFIG};name=config;downloadfilename=${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} \
+            file://linux.soc.config \
             "
-SRC_URI:cvwsoc = "\
-           https://raw.githubusercontent.com/juanschroeder/cvw/${SRCREV_BUILDROOT}/linux/devicetree/${CVWSOC_DTS};name=dts;downloadfilename=${CVWSOC_DTS}.${SRCREV_BUILDROOT} \
-          "
-SRCREV_BUILDROOT = "c8f8954b462d890f41bb57903fd6aa1c08eb1b59"
 SRCREV = "1d3a00d3bacff25652c96e1527610c69e91f7c38"
 PV = "6.12.93+git"
 LINUX_VERSION = "6.12"
@@ -32,15 +33,6 @@ LINUX_VERSION = "6.12"
 SRC_URI[sha256sum] = "9108b4be5320017c147ef5b638f97f285c4fa3a6c0c6d14d1c00f25d12070471"
 SRC_URI[config.sha256sum] = "8eade6062d71cd60664f467fba6392501d3f5bcfa754c1f7d6796cec12ac7a9e"
 
-# DTS SHA256
-SRC_URI[dts.sha256sum] = "${DTS_SHA256}"
-DTS_SHA256:cvwsoc-nexysa7 = "593f57e0d92909c8e54159d90595f910b18c49d5c1319683517bb4749687410b"
-DTS_SHA256:cvwsoc-nexysa7rv32 = "435ce440aec9a43205d8e09a83a570575c52cac6900c767e1a763d8029a7da4c"
-DTS_SHA256:cvwsoc-genesys2 = "c14842243dc96b391f9f804baa6a00f13a7e6f23c8e63000c5ebaf8861b45cab"
-DTS_SHA256:cvwsoc-genesys2xc7 = "e0afd354829d06bffb920d0d5f586749ed1235ecf38dfd82ba8cc7f577340ca0"
-DTS_SHA256:cvwsoc-genesys2rv32 = "d943cc21f9d19e2879c2784daa038802c7c98f6e074c91a78903b8b0910e4908"
-DTS_SHA256:cvwsoc-virt = "f430363c1e6f060653c090b8f07c3d5948501b2f3eb424f8e35edccea98f0456"
-DTS_SHA256:cvwsoc-virt32 = "b650c2278b42daf7768dfde6f0975af563fe00a2f85d8de5fa350ad27990c6f7"
 
 # tiny Kernel
 SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
@@ -52,13 +44,18 @@ SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'tiny', \
 # RV32 Kernel
 SRC_URI:append:cvwsoc32 = " file://fragment-rv32.cfg "
 
-SRC_URI:append:cvwsoc-nexysa7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
-SRC_URI:append:cvwsoc-nexysa7rv32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-nexysa7-dtb.patch', '', d)}"
-SRC_URI:append:cvwsoc-genesys2 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2-dtb.patch', '', d)}"
-SRC_URI:append:cvwsoc-genesys2xc7 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2xc7-dtb.patch', '', d)}"
-SRC_URI:append:cvwsoc-genesys2rv32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-genesys2rv32-dtb.patch', '', d)}"
-SRC_URI:append:cvwsoc-virt = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvw-wally-dtb.patch', '', d)}"
-SRC_URI:append:cvwsoc-virt32 = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-virt32-dtb.patch', '', d)}"
+addtask add_dtb after do_patch before do_configure
+do_add_dtb[depends] += "cvwsoc-dts:do_populate_sysroot"
+# generate DTB build patch (does not apply for Renode target)
+do_add_dtb() {
+    :
+}
+do_add_dtb:cvwsoc() {
+    install -m 644 ${RECIPE_SYSROOT}/${datadir}/cvwsoc-dts/*.dts* ${S}/arch/riscv/boot/dts/
+    sed -i "s|PLACEHOLDER|${CVWSOC_DTS_FILENAME}|" ${S}/arch/riscv/boot/dts/Makefile
+}
+
+SRC_URI:append:cvwsoc = " ${@bb.utils.contains('LINUX_VERSION', '6.12', 'file://0001-add-cvwsoc-dtb.patch', '', d)}"
 
 # FIXME: this config probably needs to be stripped down
 SRC_URI:append:cvwsocvirt = " file://fragment-mtd-ram-jffs2.cfg \
@@ -115,14 +112,15 @@ COMPATIBLE_MACHINE = "(cvwsoc)"
 # copy files where they are expected
 do_kernel_metadata:prepend() {
     # We need to copy the defconfig to the source directory for the kernel build to find it
-    install -m 644 ${UNPACKDIR}/${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} ${S}/arch/riscv/configs/linux.soc.config
+    #install -m 644 ${UNPACKDIR}/${KBUILD_DEFCONFIG}.${SRCREV_BUILDROOT} ${S}/arch/riscv/configs/linux.soc.config
+    install -m 644 ${UNPACKDIR}/${KBUILD_DEFCONFIG} ${S}/arch/riscv/configs/linux.soc.config
     printf '\n' >> ${S}/arch/riscv/configs/linux.soc.config
 }
 
-# No DTS build for Renode target
-do_kernel_metadata:prepend:cvwsoc() {
-    install -m 644 ${UNPACKDIR}/${CVWSOC_DTS}.${SRCREV_BUILDROOT} ${S}/arch/riscv/boot/dts/${CVWSOC_DTS}
-}
+# # No DTS build for Renode target
+# do_kernel_metadata:prepend:cvwsoc() {
+#     install -m 644 ${UNPACKDIR}/${CVWSOC_DTS}.${SRCREV_BUILDROOT} ${S}/arch/riscv/boot/dts/${CVWSOC_DTS}
+# }
 
 # manually generate the lz4 file u-boot accepts
 do_deploy:append() {
@@ -142,8 +140,9 @@ do_deploy:append() {
 
     # Deploy vmlinux
     cp ${B}/vmlinux ${DEPLOYDIR}
-
 }
+
+
 
 # This is broken in current Yocto: https://lists.openembedded.org/g/openembedded-core/message/226911
 KERNEL_FEATURES:remove = "${KERNEL_FEATURES_RISCV}"

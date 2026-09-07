@@ -1,0 +1,29 @@
+/dts-v1/;
+
+/include/ "cvwsoc-cpu-cva6rv32.dtsi"
+/include/ "cvwsoc.dtsi"
+/include/ "cvwsoc-board-virt.dtsi"
+
+/ {
+  model = "CVWSoC CVA6 RV32 virtual platform";
+  compatible = "cvwsoc,cva6rv32-virt", "cvwsoc,cvwsoc";
+
+  chosen {
+    linux,initrd-start = <0x84200000>;
+    linux,initrd-end = <0x85c43a00>;
+    bootargs = "earlycon=uart8250,mmio,0x10000000 console=ttyS0,115200 ignore_loglevel loglevel=8 rdinit=/bin/sh";
+  };
+
+  cpus {
+    timebase-frequency = <100000000>;
+    cpu@0 { clock-frequency = <100000000>; };
+  };
+};
+
+&refclk { clock-frequency = <100000000>; };
+&busclk { clock-frequency = <100000000>; };
+
+&{/soc/uart@10000000} {
+  /delete-property/ clocks;
+  clock-frequency = <3686400>;
+};

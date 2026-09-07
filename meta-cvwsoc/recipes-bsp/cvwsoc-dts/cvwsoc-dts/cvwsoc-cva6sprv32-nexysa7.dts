@@ -1,0 +1,25 @@
+/dts-v1/;
+
+/include/ "cvwsoc-cpu-cva6rv32.dtsi"
+/include/ "cvwsoc.dtsi"
+/include/ "cvwsoc-board-nexysa7.dtsi"
+
+/ {
+  model = "CVWSoC CVA6SP RV32 on Digilent Nexys A7";
+  compatible = "cvwsoc,cva6sprv32-nexysa7", "cvwsoc,cvwsoc";
+
+  cpus {
+    timebase-frequency = <40000000>;
+    cpu@0 {
+      clock-frequency = <40000000>;
+    };
+  };
+
+
+};
+
+&eth0 { status = "disabled"; };
+&wb_eth0 { status = "okay"; };
+
+&refclk { clock-frequency = <40000000>; };
+&busclk { clock-frequency = <60000000>; };

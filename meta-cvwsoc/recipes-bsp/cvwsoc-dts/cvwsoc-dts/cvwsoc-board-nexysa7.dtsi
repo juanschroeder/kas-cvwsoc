@@ -1,0 +1,11 @@
+/include/ "cvwsoc-pmods.dtsi"
+
+/ {
+
+  memory@80000000 {
+    device_type = "memory";
+    // 128MB RAM but test hardware was buggy beyond 0x87600000
+    reg = <0x00 0x80000000 0x00 0x7600000>;
+  };
+
+};

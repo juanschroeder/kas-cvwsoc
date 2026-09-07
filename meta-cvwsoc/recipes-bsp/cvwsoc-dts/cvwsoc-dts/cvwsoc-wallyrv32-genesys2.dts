@@ -1,0 +1,24 @@
+/dts-v1/;
+
+ /include/ "cvwsoc-cpu-wallyrv32.dtsi"
+ /include/ "cvwsoc.dtsi"
+ /include/ "cvwsoc-board-genesys2.dtsi"
+
+/ {
+  model = "CVWSoC Wally RV32 on Digilent Genesys 2";
+  compatible = "cvwsoc,wallyrv32-genesys2", "cvwsoc,cvwsoc";
+
+  cpus {
+    timebase-frequency = <55000000>;
+    cpu@0 {
+      clock-frequency = <55000000>;
+    };
+  };
+
+
+};
+
+&refclk { clock-frequency = <55000000>; };
+&busclk { clock-frequency = <100000000>; };
+
+

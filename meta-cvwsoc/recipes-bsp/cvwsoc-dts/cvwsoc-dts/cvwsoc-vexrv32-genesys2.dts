@@ -1,0 +1,22 @@
+/dts-v1/;
+
+ /include/ "cvwsoc-cpu-vexrv32.dtsi"
+ /include/ "cvwsoc.dtsi"
+ /include/ "cvwsoc-board-genesys2.dtsi"
+
+/ {
+  model = "CVWSoC VexRiscv RV32 on Digilent Genesys 2";
+  compatible = "cvwsoc,vexrv32-genesys2", "cvwsoc,cvwsoc";
+
+  cpus {
+    timebase-frequency = <125000000>;
+    cpu@0 {
+      clock-frequency = <125000000>;
+    };
+  };
+
+
+};
+
+&refclk { clock-frequency = <125000000>; };
+&busclk { clock-frequency = <100000000>; };
