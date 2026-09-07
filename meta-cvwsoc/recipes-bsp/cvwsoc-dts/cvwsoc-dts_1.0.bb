@@ -1,6 +1,8 @@
 SUMMARY = "Shared CVWSoC device tree sources"
 LICENSE = "CLOSED"
 
+inherit deploy
+
 S = "${UNPACKDIR}"
 
 SRC_URI = " \
@@ -38,6 +40,12 @@ do_install() {
     install -d ${D}${datadir}/cvwsoc-dts
     install -m 0644 ${UNPACKDIR}/cvwsoc*.dts ${D}${datadir}/cvwsoc-dts/
     install -m 0644 ${UNPACKDIR}/cvwsoc*.dtsi ${D}${datadir}/cvwsoc-dts/
+}
+
+addtask deploy after do_install before do_build
+do_deploy() {
+    install -d ${DEPLOYDIR}/dts/
+    install -m 0644 ${D}${datadir}/cvwsoc-dts/*.dts* ${DEPLOYDIR}/dts/
 }
 
 FILES:${PN} = "${datadir}/cvwsoc-dts"
