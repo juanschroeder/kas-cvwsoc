@@ -33,6 +33,14 @@ The builds below are images for specific targets.
 - 'cvwsoc-virt-tiny':             Image/binaries for sim/verilator/Makefile.cvwsoc targets for verilation in [1]. Fastest/minimal boot.
 - 'cvwsoc-virt-full':             Idem, but with more stuff.
 - 'cvwsoc-renode-u540':           Renode binaries for FU540 co-simulation
+- 'cva6soc-genesys2-doom.yml':    CVA6 (also CVA6S+) FB doom image
+- 'cva6soc-virt-tiny.yml':        CVA6 simulation image
+- 'cva6soc-virt32-tiny.yml':      CV32A6 simulation image
+- 'cva6soc-genesys2rv32-bringup.yml': CV32A6 basic image
+- 'vexriscvsoc-virt32-tiny.yml':  Vexriscv (RV32) simulation image
+- 'vexriscvsoc-nexysa7rv32-doom.yml': Vexriscv image for Nexys A7 (RV32)
+- 'vexriscvsoc-genesys2rv32-doom.yml': Vexriscv image for Genesys 2 (RV32)
+- etc
 
 E.g. 
 ```
@@ -41,7 +49,7 @@ kas build configs/cvwsoc-virt-tiny.yml
 
 Output binaries in: build/tmp/deploy/images/[TARGET]/.
 
-To flash an image you can use bmaptool. E.g.:
+To flash an image (full contents) you can use bmaptool. E.g.:
 
 ```
 $ sudo bmaptool copy cvwsoc-image-minimal-cvwsoc-genesys2rv32.rootfs.wic.gz /dev/sda
