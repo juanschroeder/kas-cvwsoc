@@ -14,7 +14,9 @@ Platforms:
 
 Soft CPUs:
 - Core-V Wally 32/64 bits
-- SiFive FU540 (Renode)
+- CV64A6, CV32A6 (CVA6S+ uses the same build)
+- Vexriscv
+- SiFive FU540 (Renode co-simulation)
 
 Remark: Currently 32 bits is only supported in Verilator and Genesys 2 (FPGA) platforms.
 
@@ -31,7 +33,7 @@ The builds below are images for specific targets.
 - 'cvwsoc-nexysa7-doom':          Image for Nexys A7 that includes stuff for running FB Doom and other extra stuff.
 - 'cvwsoc-nexysa7rv32-doom'
 - 'cvwsoc-virt-tiny':             Image/binaries for sim/verilator/Makefile.cvwsoc targets for verilation in [1]. Fastest/minimal boot.
-- 'cvwsoc-virt-full':             Idem, but with more stuff.
+- 'cvwsoc-virt-full':             Idem, but with more stuff (to test longer boot sequence)
 - 'cvwsoc-renode-u540':           Renode binaries for FU540 co-simulation
 - 'cva6soc-genesys2-doom.yml':    CVA6 (also CVA6S+) FB doom image
 - 'cva6soc-virt-tiny.yml':        CVA6 simulation image
@@ -49,11 +51,15 @@ kas build configs/cvwsoc-virt-tiny.yml
 
 Output binaries in: build/tmp/deploy/images/[TARGET]/.
 
-To flash an image (full contents) you can use bmaptool. E.g.:
+To flash an image (full contents) you can use bmaptool.
+E.g. in deploy folder run:
 
 ```
 $ sudo bmaptool copy cvwsoc-image-minimal-cvwsoc-genesys2rv32.rootfs.wic.gz /dev/sda
 ```
+
+All targets above boot and mount rootfs from the SD card.
+
 
 # References:
 
