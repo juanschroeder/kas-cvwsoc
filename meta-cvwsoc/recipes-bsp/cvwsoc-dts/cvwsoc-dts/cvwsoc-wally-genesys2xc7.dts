@@ -1,0 +1,47 @@
+// OpenXC7 build overrides for the existing Wally + Genesys2 combination.
+/include/ "cvwsoc-wally-genesys2.dts"
+
+// OpenXC7 runs the CPU and its APB peripherals at 200 MHz / 32.
+/ {
+  chosen {
+    stdout-path = "/soc/uart@10000000:115200n8";
+  };
+
+  cpus {
+    clock-frequency = <6250000>;
+    timebase-frequency = <6250000>;
+    cpu@0 {
+      clock-frequency = <6250000>;
+    };
+  };
+};
+
+&refclk { clock-frequency = <6250000>; };
+&busclk { clock-frequency = <100000000>; };
+
+&{/soc/uart@10000000} {
+  clocks = <&refclk>;
+  clock-frequency = <6250000>;
+};
+
+&{/soc/spi@13000} {
+  clocks = <&refclk>;
+  status = "okay";
+  mmc@0 {
+    status = "okay";
+  };
+};
+
+// These peripherals are not implemented in the OpenXC7 bitstream.
+&uart1 { status = "disabled"; };
+&eth0 { status = "disabled"; };
+&wb_eth0 { status = "disabled"; };
+&{/soc/usb@100c0000} { status = "disabled"; };
+&{/soc/mmc@10090000} { status = "disabled"; };
+&framebuffer0 { status = "disabled"; };
+
+// The OpenXC7 top-level does not instantiate the I2S/iDMA audio path.
+&{/sound} { status = "disabled"; };
+&i2s_tx { status = "disabled"; };
+&pcm5102a { status = "disabled"; };
+&idma { status = "disabled"; };

@@ -29,6 +29,7 @@ SRC_URI = " \
     file://cvwsoc-vexrv32-nexysa7.dts \
     file://cvwsoc-vexrv32-virt.dts \
     file://cvwsoc-wally-genesys2.dts \
+    file://cvwsoc-wally-genesys2xc7.dts \
     file://cvwsoc-wally-nexysa7.dts \
     file://cvwsoc-wally-virt.dts \
     file://cvwsoc-wallyrv32-genesys2.dts \
