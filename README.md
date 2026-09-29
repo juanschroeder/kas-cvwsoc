@@ -56,7 +56,7 @@ E.g. in deploy folder run:
 $ sudo bmaptool copy cvwsoc-image-minimal-cvwsoc-genesys2rv32.rootfs.wic.gz /dev/sda
 ```
 
-All targets above boot and mount rootfs from the SD card.
+All targets above boot and mount rootfs from the SD card (simulation and co-simulation can use preloaded RAM content for boot speed reasons).
 
 
 # References:
