@@ -18,8 +18,6 @@ Soft CPUs:
 - Vexriscv
 - SiFive FU540 (Renode co-simulation)
 
-Remark: Currently 32 bits is only supported in Verilator and Genesys 2 (FPGA) platforms.
-
 
 ## Configs / Builds
 
