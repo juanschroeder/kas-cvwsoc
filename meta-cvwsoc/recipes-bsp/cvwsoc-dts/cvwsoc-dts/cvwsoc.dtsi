@@ -51,8 +51,8 @@
           compatible = "cvwsoc,i2s";
           #sound-dai-cells = <0>;
 
-          dmas = <&idma 0>;
-          dma-names = "tx";
+          dmas = <&idma 0>, <&idma 1>;
+          dma-names = "tx", "rx";
 
           status = "okay";
   };

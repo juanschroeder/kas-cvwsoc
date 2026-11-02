@@ -1,0 +1,69 @@
+Enable dev2mem DMA for Audio RX.
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/drivers/dma/idma-engine.c b/drivers/dma/idma-engine.c
+index 17b8b1999b0ac..63690490cb962 100644
+--- a/drivers/dma/idma-engine.c
++++ b/drivers/dma/idma-engine.c
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: GPL-2.0
+ //
+ // Copyright (C) 2022 Axel Vanoni
+-	// Copyright (C) 2026 Juan Schroeder
++// Copyright (C) 2026 Juan Schroeder
+ //
+ // This driver is for a AXI-AXI-Stream iDMA with Cyclic DMA support
+ // See the iDMA fork at: https://github.com/juanschroeder/iDMA
+@@ -668,8 +668,14 @@ static inline u32 iis_idma_flags(enum dma_transaction_type tx_type,
+             case DMA_DEV_TO_MEM:
+                 direction_flags = IIS_IDMA_DESC_PROTOCOL_AXISTREAM << IIS_IDMA_DESC_FLAGS_PROTOCOL_SRC_BIT |
+                                   IIS_IDMA_DESC_PROTOCOL_AXI << IIS_IDMA_DESC_FLAGS_PROTOCOL_DST_BIT;
+-                memory_flags = IIS_IDMA_AXI_INCR << 3;
+-                /* FIXME: this is not supported yet */
++                memory_flags = IIS_IDMA_AXI_INCR << 1 | IIS_IDMA_AXI_INCR << 3;
++                return
++                    direction_flags |
++                    memory_flags |
++                    IIS_IDMA_DESC_FLAGS_DEBURST_BIT | // deburst
++                    IIS_IDMA_DESC_FLAGS_SERIALIZE_BIT |
++                    BIT(IIS_IDMA_DESC_FLAGS_PRESERVE_BIT) |
++                    (do_interrupt ? IIS_IDMA_DESC_FLAGS_IRQ_BIT : 0);
+                 break;
+             default:
+                 // ERROR
+@@ -781,7 +787,7 @@ static struct dma_async_tx_descriptor *iis_idma_prep_dma_cyclic(
+                 return NULL;
+ 
+         /* DMA_DEV_TO_MEM unsupported for now */
+-        if (direction != DMA_MEM_TO_DEV /*&& direction != DMA_MEM_TO_MEM*/)
++        if (direction != DMA_MEM_TO_DEV && direction != DMA_DEV_TO_MEM)
+             return NULL;
+ 
+         if (period_len > IIS_IDMA_MAX_AXIS_DESC_BYTES)
+@@ -821,13 +827,11 @@ static struct dma_async_tx_descriptor *iis_idma_prep_dma_cyclic(
+                         sw_desc->hw_descs[i]->src = cpu_to_le64((u64)buf_addr);
+                         sw_desc->hw_descs[i]->dst = 0ULL;
+                 }
+-                /*
+-                else if
++                else if (direction == DMA_DEV_TO_MEM)
+                 {
+                         sw_desc->hw_descs[i]->src = 0ULL;
+                         sw_desc->hw_descs[i]->dst = cpu_to_le64((u64)buf_addr);
+                 }
+-                */
+                 buf_addr += next_length;
+         }
+ 
+@@ -1281,7 +1285,7 @@ static int iis_idma_probe(struct platform_device *pdev)
+         idma_dev->dma_dev.residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
+         idma_dev->dma_dev.src_addr_widths = IIS_IDMA_SUPPORTED_ADDRESS_WIDTH;
+         idma_dev->dma_dev.dst_addr_widths = IIS_IDMA_SUPPORTED_ADDRESS_WIDTH;
+-        idma_dev->dma_dev.directions = /*BIT(DMA_DEV_TO_MEM) | */BIT(DMA_MEM_TO_DEV) |
++        idma_dev->dma_dev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV) |
+                                         BIT(DMA_MEM_TO_MEM);
+         idma_dev->dma_dev.device_prep_dma_cyclic = iis_idma_prep_dma_cyclic;
+         idma_dev->dma_dev.device_config = iis_idma_slave_config;

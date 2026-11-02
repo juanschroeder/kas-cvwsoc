@@ -88,6 +88,9 @@ SRC_URI:append = " ${@bb.utils.contains('DISTRO_FEATURES', 'fbcon', \
                     file://0015-idma-cyclic-dma-support-and-fixes.patch \
                     file://0016-asoc-i2s-driver.patch \
                     file://0017-bugfix-physmap-rounding-power2-down.patch \
+                    file://0018-idma-add-dev2mem.patch \
+                    file://0019-pcm5102a-add-fake-capture.patch \
+                    file://0020-asoc-i2s-rx.patch \
                     file://fragment-idma-engine-proxy.cfg \
                     file://fragment-cvwsoc-i2s.cfg \
                     file://fragment-pcm5102a.cfg \

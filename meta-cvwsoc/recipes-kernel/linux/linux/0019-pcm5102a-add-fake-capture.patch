@@ -1,0 +1,41 @@
+Enable fake capture for PCM5102A codec for audio RX path.
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/sound/soc/codecs/pcm5102a.c b/sound/soc/codecs/pcm5102a.c
+index 3401a25341e61..cc1a507a49554 100644
+--- a/sound/soc/codecs/pcm5102a.c
++++ b/sound/soc/codecs/pcm5102a.c
+@@ -22,6 +22,18 @@ static struct snd_soc_dai_driver pcm5102a_dai = {
+ 			   SNDRV_PCM_FMTBIT_S24_LE |
+ 			   SNDRV_PCM_FMTBIT_S32_LE
+ 	},
++    	/*
++        * Fake capture capability for CVWSoC FPGA I2S RX.
++        * Capture data does NOT come from the PCM5102A codec.
++        */
++    .capture = {
++            .channels_min = 2,
++            .channels_max = 2,
++            .rates = SNDRV_PCM_RATE_8000_384000,
++            .formats = SNDRV_PCM_FMTBIT_S16_LE |
++                        SNDRV_PCM_FMTBIT_S24_LE |
++                        SNDRV_PCM_FMTBIT_S32_LE,
++    },    
+ };
+ 
+ static struct snd_soc_component_driver soc_component_dev_pcm5102a = {
+@@ -32,6 +44,11 @@ static struct snd_soc_component_driver soc_component_dev_pcm5102a = {
+ 
+ static int pcm5102a_probe(struct platform_device *pdev)
+ {
++
++    dev_info(&pdev->dev, "PCM5102 DAI: playback=%u capture=%u\n",
++            pcm5102a_dai.playback.channels_min,
++            pcm5102a_dai.capture.channels_min);
++
+ 	return devm_snd_soc_register_component(&pdev->dev, &soc_component_dev_pcm5102a,
+ 			&pcm5102a_dai, 1);
+ }

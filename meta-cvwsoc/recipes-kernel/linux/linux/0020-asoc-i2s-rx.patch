@@ -1,0 +1,60 @@
+Enable Audio capture.
+
+Upstream-Status: Pending
+
+Signed-off-by: Juan Schroeder <jcschroeder@gmail.com>
+
+diff --git a/sound/soc/cvwsoc/cvwsoc_i2s.c b/sound/soc/cvwsoc/cvwsoc_i2s.c
+index 756b6fd8ebd4b..f5080fd4633f5 100644
+--- a/sound/soc/cvwsoc/cvwsoc_i2s.c
++++ b/sound/soc/cvwsoc/cvwsoc_i2s.c
+@@ -75,6 +75,12 @@ static struct snd_dmaengine_dai_dma_data cvwsoc_i2s_tx_dma = {
+ 	.maxburst   = 1,
+ };
+ 
++static struct snd_dmaengine_dai_dma_data cvwsoc_i2s_rx_dma = {
++	.addr       = 0,
++	.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
++	.maxburst   = 1,
++};
++
+ 
+ static struct snd_soc_dai_driver cvwsoc_i2s_dai = {
+ 	.name = "audio-dai",
+@@ -87,6 +93,15 @@ static struct snd_soc_dai_driver cvwsoc_i2s_dai = {
+ 		.rate_max = 44100,
+ 		.formats      = SNDRV_PCM_FMTBIT_S24_LE,
+ 	},
++	.capture = {
++		.stream_name  = "Capture",
++		.channels_min = 2,
++		.channels_max = 2,
++		.rates        = SNDRV_PCM_RATE_44100,
++		.rate_min = 44100,
++		.rate_max = 44100,
++		.formats      = SNDRV_PCM_FMTBIT_S24_LE,
++	},
+ };
+ 
+ static int cvwsoc_i2s_component_probe(struct snd_soc_component *component)
+@@ -94,7 +109,7 @@ static int cvwsoc_i2s_component_probe(struct snd_soc_component *component)
+ 	struct snd_soc_dai *dai;
+ 
+ 	for_each_component_dais(component, dai) {
+-		snd_soc_dai_init_dma_data(dai, &cvwsoc_i2s_tx_dma, NULL);
++		snd_soc_dai_init_dma_data(dai, &cvwsoc_i2s_tx_dma,  &cvwsoc_i2s_rx_dma);
+ 		return 0;
+ 	}
+ 
+@@ -165,6 +180,11 @@ static int cvwsoc_i2s_probe(struct platform_device *pdev)
+ 		goto error;
+ 	}
+ 
++    /* cvwsoc probe */
++    dev_info(&pdev->dev, "CPU DAI: playback=%u capture=%u\n",
++            cvwsoc_i2s_dai.playback.channels_min,
++            cvwsoc_i2s_dai.capture.channels_min);
++
+ 	return 0;
+ 
+ error:
